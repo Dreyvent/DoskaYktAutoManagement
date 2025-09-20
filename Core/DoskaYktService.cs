@@ -519,6 +519,23 @@ namespace DoskaYkt_AutoManagement.Core
                             ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].scrollIntoView({block:'center'});", btn);
                             btn.Click();
 
+                            // Проверяем, есть ли радиокнопки причин
+                            var reasons = _driver.FindElements(By.CssSelector("input[name='reason_code']"));
+                            if (reasons.Any())
+                            {
+                                // ищем "Пропустить вопрос"
+                                var skipReason = reasons.FirstOrDefault(r => r.GetAttribute("value") == "310");
+                                if (skipReason != null)
+                                {
+                                    ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", skipReason);
+                                }
+                                else
+                                {
+                                    // если "пропустить" нет, просто берём первый вариант
+                                    ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", reasons.First());
+                                }
+                            }
+
                             // Подтверждение в модалке
                             var confirm = _wait.Until(d => d.FindElements(By.CssSelector("button.d-cancel_reason-modal-delete")).FirstOrDefault());
                             confirm.Click();
