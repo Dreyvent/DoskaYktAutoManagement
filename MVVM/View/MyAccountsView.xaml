@@ -1,0 +1,149 @@
+﻿<UserControl x:Class="DoskaYkt_AutoManagement.MVVM.View.MyAccountsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:DoskaYkt_AutoManagement.MVVM.View"
+             xmlns:viewModel="clr-namespace:DoskaYkt_AutoManagement.MVVM.ViewModel"
+             xmlns:converters="clr-namespace:DoskaYkt_AutoManagement.Converters"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="800"
+             UseLayoutRounding="True">
+    <UserControl.Resources>
+        <converters:EditModeToContentConverter x:Key="EditModeToContentConverter"/>
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </UserControl.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ScrollViewer.Resources>
+            <Style TargetType="ScrollBar" BasedOn="{StaticResource CustomScrollBar}"/>
+        </ScrollViewer.Resources>
+        <StackPanel Margin="20,0,20,20" Orientation="Vertical">
+            <Border Style="{StaticResource CardPanel}">
+                <StackPanel>
+                    <TextBlock Text="Мои аккаунты" FontFamily="/Fonts/#Play" Foreground="White" FontSize="28" Margin="0,0,0,10"/>
+                    <StackPanel Orientation="Vertical" Margin="0,0,0,20">
+                        <Grid Width="300" HorizontalAlignment="Left">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="auto"/>
+                                <ColumnDefinition/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                                <RowDefinition/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Логин" Foreground="White" Margin="0,5,5,0" Grid.Column="0" Grid.Row="0" />
+                            <TextBox Width="200" Height="20" Margin="0,5,0,10" Text="{Binding Login, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" Grid.Row="0" ToolTip="Введите логин аккаунта"/>
+                            <TextBlock Text="Пароль" Foreground="White" Margin="0,5,5,0" Grid.Column="0" Grid.Row="1"/>
+                            <Grid Grid.Column="1" Grid.Row="1" Width="200" Margin="0,5,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition />
+                                    <ColumnDefinition Width="auto" />
+                                </Grid.ColumnDefinitions>
+                                <!-- Общая рамка -->
+                                <Border Grid.ColumnSpan="2"
+                                    Background="White"
+                                    BorderBrush="#333"
+                                    BorderThickness="1"
+                                    Padding="6">
+                                    <!-- Здесь фон и рамка -->
+                                </Border>
+                                <PasswordBox
+                                Margin="8,0,40,0"
+                                Height="20"
+                                Background="Transparent"
+                                Foreground="Black"
+                                BorderThickness="0"
+                                FontSize="14"
+                                Visibility="{Binding ShowPassword, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
+                                converters:PasswordBoxAssistant.BindPassword="True"
+                                converters:PasswordBoxAssistant.BoundPassword="{Binding Password, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBox
+                                Margin="8,0,40,0"
+                                Height="20"
+                                Background="Transparent"
+                                Foreground="Black"
+                                BorderThickness="0"
+                                FontSize="14"
+                                Text="{Binding Password, UpdateSourceTrigger=PropertyChanged}"
+                                Visibility="{Binding ShowPassword, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                <Button Grid.Column="1"
+                                    Width="28"
+                                    Height="18"
+                                    Margin="5,0,5,0"
+                                    VerticalAlignment="Center"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    FocusVisualStyle="{x:Null}"
+                                    Command="{Binding ToggleShowPasswordCommand}"
+                                    ToolTip="Показать/скрыть пароль">
+                                    <TextBlock FontFamily="/Fonts/#Font Awesome 7 Free"
+                                           FontSize="14"
+                                           Foreground="Black">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="&#xf070;"/>
+                                                <!-- eye-slash -->
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ShowPassword}" Value="True">
+                                                        <Setter Property="Text" Value="&#xf06e;"/>
+                                                        <!-- eye -->
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Button>
+
+                            </Grid>
+                            <Button Width="200" Margin="0,10,0,0" Command="{Binding SaveAccountCommand}" Grid.Column="1" Grid.Row="2" Content="{Binding EditingAccount, Converter={StaticResource EditModeToContentConverter}}" ToolTip="Сохранить аккаунт"/>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <Separator Margin="0,10,0,10"/>
+            <Border Style="{StaticResource CardPanel}">
+                <StackPanel>
+                    <TextBlock Text="Список аккаунтов" FontFamily="/Fonts/#Play" Foreground="White" FontSize="28" Margin="0,0,0,10"/>
+                    <ListView ItemsSource="{Binding Accounts}" Width="600" Height="200">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Логин" DisplayMemberBinding="{Binding Login}" Width="150"/>
+                                <GridViewColumn Header="Пароль" Width="150">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="••••••"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Выбрать" Width="80">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="Выбрать" Command="{Binding DataContext.SelectAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" ToolTip="Сделать этот аккаунт текущим"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Редактировать" Width="100">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="Редактировать" Command="{Binding DataContext.EditAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" ToolTip="Редактировать аккаунт"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Действие" Width="80">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Button Content="Удалить" Command="{Binding DataContext.DeleteAccountCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" ToolTip="Удалить аккаунт"/>
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

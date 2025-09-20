@@ -1,0 +1,56 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Базовые кисти -->
+    <SolidColorBrush x:Key="Btn_Normal_BG" Color="Transparent"/>
+    <SolidColorBrush x:Key="Btn_Hover_BG" Color="#22FFFFFF"/>
+    <SolidColorBrush x:Key="Btn_Pressed_BG" Color="#44FFFFFF"/>
+
+    <!-- Цвета для текста -->
+    <SolidColorBrush x:Key="Btn_Normal_FG" Color="White"/>
+    <SolidColorBrush x:Key="Btn_Hover_FG" Color="Red"/>
+    <!-- например для Exit -->
+    <SolidColorBrush x:Key="Btn_Pressed_FG" Color="DarkRed"/>
+
+    <!-- Общий стиль для кнопок окна -->
+    <Style x:Key="WindowBtnsTheme" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource Btn_Normal_BG}"/>
+        <Setter Property="Foreground" Value="{StaticResource Btn_Normal_FG}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontFamily" Value="Fonts/#Font Awesome 7 Free"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                        Background="{TemplateBinding Background}"
+                        BorderThickness="0"
+                        CornerRadius="12"
+                        SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      RecognizesAccessKey="True"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!-- Hover -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border"
+                                Property="Background"
+                                Value="{StaticResource Btn_Hover_BG}"/>
+                            <Setter Property="Foreground"
+                                Value="{StaticResource Btn_Hover_FG}"/>
+                        </Trigger>
+                        <!-- Pressed -->
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border"
+                                Property="Background"
+                                Value="{StaticResource Btn_Pressed_BG}"/>
+                            <Setter Property="Foreground"
+                                Value="{StaticResource Btn_Pressed_FG}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</ResourceDictionary>
