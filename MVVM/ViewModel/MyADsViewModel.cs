@@ -53,11 +53,10 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             set => SetProperty(ref _publishMinutesInput, value);
         }
 
-        private readonly DoskaYktService _siteService;
+        private readonly DoskaYktService _siteService = DoskaYktService.Instance;
 
         public MyADsViewModel()
         {
-            _siteService = new DoskaYktService();
             AdScheduler.Instance.AdRepostRequested += OnAdRepostRequested;
             DeleteAdCommand = new RelayCommand(DeleteAd, () => HasSelection);
             BumpAdCommand = new RelayCommand(BumpAd, () => HasSelection);

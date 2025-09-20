@@ -11,7 +11,7 @@ namespace DoskaYkt_AutoManagement
     public partial class App : Application
     {
         public static readonly HttpClient SharedHttpClient = new HttpClient();
-        private readonly DoskaYktService _service = new DoskaYktService();
+        private readonly DoskaYktService _service = DoskaYktService.Instance;
         private Forms.NotifyIcon? _notifyIcon;
 
         protected override async void OnStartup(StartupEventArgs e)
@@ -85,7 +85,7 @@ namespace DoskaYkt_AutoManagement
                             return;
                         }
 
-                        var service = new Core.DoskaYktService();
+                        var service = Core.DoskaYktService.Instance;
                         string siteId = string.IsNullOrWhiteSpace(ad.SiteId) ? null : ad.SiteId;
 
                         // 1) Снять с публикации

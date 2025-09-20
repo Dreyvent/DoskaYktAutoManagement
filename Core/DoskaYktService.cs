@@ -18,9 +18,29 @@ namespace DoskaYkt_AutoManagement.Core
 {
     public class DoskaYktService
     {
+        private static DoskaYktService _instance;
         private IWebDriver _driver;
         private WebDriverWait _wait;
         private string _lastDriverKind; // "chrome" | "firefox"
+
+        public static DoskaYktService Instance
+        {
+            get
+            {
+                if (_instance == null)
+                    _instance = new DoskaYktService();
+                return _instance;
+            }
+        }
+
+        private DoskaYktService()
+        {
+            _driver = null;
+            _wait = null;
+            _lastDriverKind = null;
+            _isLoggedIn = false;
+            _currentLogin = null;
+        }
 
         public bool IsSessionActive => _driver != null;
 

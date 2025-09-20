@@ -56,13 +56,12 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         public RelayCommand ClearFoundSelectionCommand { get; }
         public RelayCommand EndSessionCommand { get; }
 
-        private readonly DoskaYktService _service;
+        private readonly DoskaYktService _service = DoskaYktService.Instance;
 
         private readonly AdScheduler _scheduler = AdScheduler.Instance;
 
         public HomeViewModel()
         {
-            _service = new DoskaYktService(); // временно, позже DI
             CheckAdsCommand = new AsyncRelayCommand(CheckAdsAsync);
             SaveSelectedCommand = new AsyncRelayCommand(SaveSelectedAdsAsync);
             SelectAllFoundCommand = new RelayCommand(() =>
