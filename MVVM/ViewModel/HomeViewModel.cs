@@ -171,33 +171,13 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             int saved = 0;
             foreach (var found in selected)
             {
-                AdData full = null;
-                string msg = null;
-                bool ok = false;
-
-                if (!string.IsNullOrWhiteSpace(found.Id))
-                {
-                    var r = await _service.FetchAdFromByIdAsync(acc.Login, acc.Password, found.Id, IsBrowserVisible);
-                    ok = r.success; msg = r.message; full = r.ad;
-                }
-                else
-                {
-                    // Фоллбэк по названию
-                    var r = await _service.FetchAdFromTitleAsync(acc.Login, acc.Password, found.Title, IsBrowserVisible);
-                    ok = r.success; msg = r.message; full = r.ad;
-                }
-
-                if (!ok || full == null)
-                {
-                    Core.TerminalLogger.Instance.Log($"[SaveSelected] Пропуск '{found.Title}': {msg}");
-                    continue;
-                }
-
                 var newAd = new Ad
                 {
-                    Title = full.Title ?? found.Title,
+                    Title = found.Title,
                     AccountId = acc.Id,
                     AccountLogin = acc.Login,
+                    SiteId = found.Id,         // если у тебя поле такое есть
+                    IsPublished = found.IsPublished
                 };
 
                 await AdManager.Instance.AddAdAsync(newAd);
@@ -208,6 +188,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             StatusMessage = saved > 0 ? $"Сохранено {saved} объявлений в БД." : "Не удалось сохранить объявления.";
             OnPropertyChanged(nameof(AdsCount));
         }
+
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)

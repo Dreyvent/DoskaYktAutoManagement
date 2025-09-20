@@ -37,7 +37,7 @@ namespace DoskaYkt_AutoManagement
             _notifyIcon = new Forms.NotifyIcon
             {
                 Icon = new System.Drawing.Icon("Images/DoskaYkt-AutoCreator-Favicon3.ico"),
-                Text = "DoskaYkt ADAutoCreator",
+                Text = "DoskaYkt AutoManagement",
                 Visible = false
             };
 

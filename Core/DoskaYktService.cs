@@ -65,12 +65,22 @@ namespace DoskaYkt_AutoManagement.Core
         private void EnsureSession(bool showChrome)
         {
             if (_driver != null) return;
+
             var options = BuildChromeOptions(showChrome);
             options.AddExcludedArgument("enable-automation");
             options.AddAdditionalOption("useAutomationExtension", false);
             _driver = new ChromeDriver(options);
             _lastDriverKind = "chrome";
             _wait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(500));
+        }
+
+        private void EnsureLoggedIn(string login, string password)
+        {
+            if (!IsLoggedIn || !string.Equals(CurrentLogin, login, StringComparison.OrdinalIgnoreCase))
+            {
+                _driver.Navigate().GoToUrl(BaseUrl);
+                PerformLogin(_driver, _wait, login, password);
+            }
         }
 
         // Авторизация на сайте
@@ -82,8 +92,7 @@ namespace DoskaYkt_AutoManagement.Core
                 try
                 {
                     EnsureSession(showChrome);
-                    _driver.Navigate().GoToUrl("https://doska.ykt.ru/");
-                    PerformLogin(_driver, _wait, login, password);
+                    EnsureLoggedIn(login, password);
                     // Убедимся, что логин действительно выполнен
                     _wait.Until(d => d.FindElements(By.CssSelector(".ygm-userpanel_username")).Any());
                     return true;
@@ -131,10 +140,7 @@ namespace DoskaYkt_AutoManagement.Core
             try
             {
                 EnsureSession(showChrome);
-                _driver.Navigate().GoToUrl("https://doska.ykt.ru/");
-                Core.TerminalLogger.Instance.Log("[CheckAds] Зашли на сайт doska.ykt.ru");
-
-                PerformLogin(_driver, _wait, login, password);
+                EnsureLoggedIn(login, password);
                 // Проверяем, залогинен ли кто-то (ищем имя пользователя в верхнем меню)
                 var userPanel = _driver.FindElements(By.CssSelector(".ygm-userpanel_username")).FirstOrDefault();
                 if (userPanel != null)
@@ -422,27 +428,24 @@ namespace DoskaYkt_AutoManagement.Core
             return Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var options = BuildChromeOptions(showChrome);
                 try
                 {
-                    using var driver = new ChromeDriver(options);
-                    var wait = new WebDriverWait(new SystemClock(), driver, TimeSpan.FromSeconds(40), TimeSpan.FromMilliseconds(250));
-                    driver.Navigate().GoToUrl("https://doska.ykt.ru/");
-                    PerformLogin(driver, wait, login, password);
+                    EnsureSession(showChrome);
+                    EnsureLoggedIn(login, password);
                     Core.TerminalLogger.Instance.Log("[ExistsAd] Открываем профиль /profile/posts");
-                    driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
-                    wait.Until(d => { try { return ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").ToString() == "complete"; } catch { return false; } });
-                    wait.Until(d => d.FindElements(By.CssSelector(".d-post"))?.Any() == true);
+                    _driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
+                    _wait.Until(d => { try { return ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").ToString() == "complete"; } catch { return false; } });
+                    _wait.Until(d => d.FindElements(By.CssSelector(".d-post"))?.Any() == true);
 
                     // Если adId не цифры — пытаемся найти по заголовку
                     var idToCheck = Regex.IsMatch(adId ?? string.Empty, @"^\d+$") ? adId : null;
                     if (idToCheck == null && !string.IsNullOrWhiteSpace(adTitle))
                     {
-                        idToCheck = ResolveSiteAdIdOnPage(driver, adTitle);
+                        idToCheck = ResolveSiteAdIdOnPage(_driver, adTitle);
                     }
                     if (idToCheck == null) return false;
 
-                    var found = driver.FindElements(By.CssSelector($".d-post_info-service span"))
+                    var found = _driver.FindElements(By.CssSelector($".d-post_info-service span"))
                                         .Any(s => (s.Text ?? string.Empty).Contains(idToCheck));
                     return found;
                 }
@@ -459,27 +462,25 @@ namespace DoskaYkt_AutoManagement.Core
             return Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var options = BuildChromeOptions(showChrome);
                 try
                 {
-                    using var driver = new ChromeDriver(options);
-                    var wait = new WebDriverWait(new SystemClock(), driver, TimeSpan.FromSeconds(50), TimeSpan.FromMilliseconds(250));
-                    driver.Navigate().GoToUrl("https://doska.ykt.ru/");
-                    PerformLogin(driver, wait, login, password);
+                    EnsureSession(showChrome);
+                    EnsureLoggedIn(login, password);
+
                     Core.TerminalLogger.Instance.Log("[Unpublish] Открываем профиль /profile/posts");
-                    driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
-                    wait.Until(d => { try { return ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").ToString() == "complete"; } catch { return false; } });
-                    wait.Until(d => d.FindElements(By.CssSelector(".d-post"))?.Any() == true);
+                    _driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
+                    _wait.Until(d => { try { return ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").ToString() == "complete"; } catch { return false; } });
+                    _wait.Until(d => d.FindElements(By.CssSelector(".d-post"))?.Any() == true);
 
                     string idToUse = Regex.IsMatch(adId ?? string.Empty, @"^\d+$") ? adId : null;
                     if (idToUse == null && !string.IsNullOrWhiteSpace(adTitle))
                     {
-                        idToUse = ResolveSiteAdIdOnPage(driver, adTitle);
+                        idToUse = ResolveSiteAdIdOnPage(_driver, adTitle);
                         if (idToUse == null) return false;
                     }
 
                     // Находим карточку по номеру
-                    var posts = driver.FindElements(By.CssSelector(".d-post"));
+                    var posts = _driver.FindElements(By.CssSelector(".d-post"));
                     foreach (var post in posts)
                     {
                         try
@@ -495,15 +496,15 @@ namespace DoskaYkt_AutoManagement.Core
                             }
                             if (btn == null) continue;
 
-                            ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView({block:'center'});", btn);
+                            ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].scrollIntoView({block:'center'});", btn);
                             btn.Click();
 
                             // Подтверждение в модалке
-                            var confirm = wait.Until(d => d.FindElements(By.CssSelector("button.d-cancel_reason-modal-delete")).FirstOrDefault());
+                            var confirm = _wait.Until(d => d.FindElements(By.CssSelector("button.d-cancel_reason-modal-delete")).FirstOrDefault());
                             confirm.Click();
 
                             // Ждём, пока карточка пропадёт из активных
-                            wait.Until(d => { try { var stillThere = d.FindElements(By.CssSelector(".d-post .d-post_info-service span")).Any(s => (s.Text ?? string.Empty).Contains(idToUse)); return !stillThere; } catch { return true; } });
+                            _wait.Until(d => { try { var stillThere = d.FindElements(By.CssSelector(".d-post .d-post_info-service span")).Any(s => (s.Text ?? string.Empty).Contains(idToUse)); return !stillThere; } catch { return true; } });
                             return true;
                         }
                         catch { }
@@ -523,20 +524,17 @@ namespace DoskaYkt_AutoManagement.Core
             return Task.Run(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var options = BuildChromeOptions(showChrome);
                 try
                 {
-                    using var driver = new ChromeDriver(options);
-                    var wait = new WebDriverWait(new SystemClock(), driver, TimeSpan.FromSeconds(40), TimeSpan.FromMilliseconds(250));
-                    driver.Navigate().GoToUrl("https://doska.ykt.ru/");
-                    PerformLogin(driver, wait, login, password);
+                    EnsureSession(showChrome);
+                    EnsureLoggedIn(login, password);
 
                     // Переходим в Неопубликованные
-                    driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts/finished");
-                    wait.Until(d => d.FindElements(By.CssSelector(".d-post")).Any());
+                    _driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts/finished");
+                    _wait.Until(d => d.FindElements(By.CssSelector(".d-post")).Any());
 
                     // Найдём карточку с нужным id
-                    var posts = driver.FindElements(By.CssSelector(".d-post"));
+                    var posts = _driver.FindElements(By.CssSelector(".d-post"));
                     foreach (var post in posts)
                     {
                         try
@@ -561,32 +559,32 @@ namespace DoskaYkt_AutoManagement.Core
                             var activate = post.FindElements(By.CssSelector("a.d-post_info-sell")).FirstOrDefault();
                             if (activate == null) return false;
 
-                            ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView({block:'center'});", activate);
+                            ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].scrollIntoView({block:'center'});", activate);
                             activate.Click();
 
                             // Ожидаем страницу выбора пакета
-                            wait.Until(d => d.FindElements(By.CssSelector(".d-servicePacks_tw")).Any());
+                            _wait.Until(d => d.FindElements(By.CssSelector(".d-servicePacks_tw")).Any());
 
                             // Убедимся, что вкладка "Бесплатно" активна, иначе активируем
-                            var freeTab = driver.FindElements(By.CssSelector(".d-sp_tab.d-sp_tab--default.d-servicePacks_tw"))
+                            var freeTab = _driver.FindElements(By.CssSelector(".d-sp_tab.d-sp_tab--default.d-servicePacks_tw"))
                                 .FirstOrDefault(el => (el.GetAttribute("class") ?? string.Empty).Contains("active"));
                             if (freeTab == null)
                             {
                                 // клик по label внутри блока с id="free"
-                                var freeInput = driver.FindElements(By.CssSelector("input#free.d-sp_input.d-servicePacks_input")).FirstOrDefault();
+                                var freeInput = _driver.FindElements(By.CssSelector("input#free.d-sp_input.d-servicePacks_input")).FirstOrDefault();
                                 if (freeInput != null)
                                 {
-                                    ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].click();", freeInput);
+                                    ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", freeInput);
                                 }
                             }
 
                             // Нажимаем зелёную кнопку подтверждения
-                            var submit = wait.Until(d => d.FindElements(By.CssSelector("button.yui-btn.yui-btn--green.d-post-add-submit.d-servicePacks_submit_btn.free")).FirstOrDefault());
-                            ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView({block:'center'});", submit);
+                            var submit = _wait.Until(d => d.FindElements(By.CssSelector("button.yui-btn.yui-btn--green.d-post-add-submit.d-servicePacks_submit_btn.free")).FirstOrDefault());
+                            ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].scrollIntoView({block:'center'});", submit);
                             submit.Click();
 
                             // Ждём редирект на страницу объявления /{id}
-                            wait.Until(d => { try { var url = d.Url ?? string.Empty; return Regex.IsMatch(url, @"https://doska\.ykt\.ru/\d+$"); } catch { return false; } });
+                            _wait.Until(d => { try { var url = d.Url ?? string.Empty; return Regex.IsMatch(url, @"https://doska\.ykt\.ru/\d+$"); } catch { return false; } });
                             return true;
                         }
                         catch { }
@@ -610,8 +608,7 @@ namespace DoskaYkt_AutoManagement.Core
                 try
                 {
                     EnsureSession(showChrome);
-                    _driver.Navigate().GoToUrl("https://doska.ykt.ru/");
-                    PerformLogin(_driver, _wait, login, password);
+                    EnsureLoggedIn(login, password);
                     _driver.Navigate().GoToUrl($"https://doska.ykt.ru/profile/posts");
                     var posts = _driver.FindElements(By.CssSelector(".d-post"));
                     foreach (var post in posts)
@@ -648,8 +645,7 @@ namespace DoskaYkt_AutoManagement.Core
                 try
                 {
                     EnsureSession(showChrome);
-                    _driver.Navigate().GoToUrl("https://doska.ykt.ru/");
-                    PerformLogin(_driver, _wait, login, password);
+                    EnsureLoggedIn(login, password);
                     _driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
                     _wait.Until(d => d.FindElements(By.CssSelector(".d-post")).Any());
 
