@@ -73,7 +73,7 @@
                              Foreground="White"
                              FontSize="16"
                              Style="{StaticResource MenuButtonTheme}"
-                             IsChecked="True"
+                             IsChecked="{Binding IsHomeViewSelected, Mode=OneWay}"
                              Command="{Binding HomeViewCommand}"/>
 
                 <RadioButton Content="Мои объявления"
@@ -81,6 +81,7 @@
                              Foreground="White"
                              FontSize="16"
                              Style="{StaticResource MenuButtonTheme}"
+                             IsChecked="{Binding IsMyADsViewSelected, Mode=OneWay}"
                              Command="{Binding MyADsViewCommand}"/>
 
                 <RadioButton Content="Мои аккаунты"
@@ -88,6 +89,7 @@
                              Foreground="White"
                              FontSize="16"
                              Style="{StaticResource MenuButtonTheme}"
+                             IsChecked="{Binding IsMyAccountsViewSelected, Mode=OneWay}"
                              Command="{Binding MyAccountsViewCommand}"/>
             </StackPanel>
             <StackPanel Grid.Row="2">

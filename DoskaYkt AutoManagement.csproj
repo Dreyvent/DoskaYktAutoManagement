@@ -10,15 +10,41 @@
 		<StartupObject>DoskaYkt_AutoManagement.App</StartupObject>
 		<ApplicationIcon>Images\DoskaYkt-Favicon.ico</ApplicationIcon>
 		<Description>Автоматическое создание и удаление объявлений в сайте DoskaYkt</Description>
-		<FileVersion>0.6.0</FileVersion>
+		<FileVersion>0.6.2</FileVersion>
 		<NeutralLanguage>ru</NeutralLanguage>
 		<Title>DoskaYkt ADAutoManagement</Title>
 		<Company>Arch Kitsune Studio</Company>
 		<Copyright>(c) 2025 Arch Kitsune Studio/Andrey Dedyukin. All rights reserved.</Copyright>
 		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
 		<EnableDefaultPageItems>false</EnableDefaultPageItems>
-		<Version>0.6.0</Version>
-		<PlatformTarget>x64</PlatformTarget>
+		<Version>0.6.2</Version>
+		<PlatformTarget>AnyCPU</PlatformTarget>
+		<AssemblyTitle>DoskaYkt AutoManagement</AssemblyTitle>
+		<AssemblyDescription>Автоматическое управление объявлениями на DoskaYkt</AssemblyDescription>
+		<AssemblyCompany>Arch Kitsune Studio</AssemblyCompany>
+		<AssemblyProduct>DoskaYkt AutoManagement</AssemblyProduct>
+		<AssemblyCopyright>Copyright © 2025 Arch Kitsune Studio</AssemblyCopyright>
+		<AssemblyVersion></AssemblyVersion>
+		<AssemblyFileVersion>0.6.0.0</AssemblyFileVersion>
+		<AssemblyInformationalVersion>0.6.0-beta</AssemblyInformationalVersion>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)'=='Release'">
+		<Optimize>true</Optimize>
+		<DebugType>pdbonly</DebugType>
+		<DebugSymbols>true</DebugSymbols>
+		<DefineConstants>TRACE</DefineConstants>
+		<ErrorReport>prompt</ErrorReport>
+		<WarningLevel>4</WarningLevel>
+		<Prefer32Bit>false</Prefer32Bit>
+		<UseWPF>true</UseWPF>
+		<UseWindowsForms>false</UseWindowsForms>
+		<EnableWindowsTargeting>true</EnableWindowsTargeting>
+		<SelfContained>false</SelfContained>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<PublishSingleFile>false</PublishSingleFile>
+		<PublishReadyToRun>false</PublishReadyToRun>
+		<PublishTrimmed>false</PublishTrimmed>
 	</PropertyGroup>
 
 	<ItemGroup>

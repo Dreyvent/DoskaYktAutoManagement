@@ -143,29 +143,53 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             }
             StatusMessage = "Проверяем аккаунт...";
 
-            // Вызов сервиса, который вернёт List<AdData>
-            var (success, message, ads) = _service.CheckAds(login, password, IsBrowserVisible);
+            // 1. Сканируем опубликованные объявления
+            StatusMessage = "Сканируем опубликованные объявления...";
+            var (success, message, publishedAds) = _service.CheckAds(login, password, IsBrowserVisible);
+            
+            Core.TerminalLogger.Instance.Log("[CheckAds] Опубликованные: " + message);
 
-            StatusMessage = message ?? (success ? "Готово" : "Ошибка");
-            Core.TerminalLogger.Instance.Log("[CheckAds] " + message);
+            // 2. Сканируем неопубликованные объявления
+            StatusMessage = "Сканируем неопубликованные объявления...";
+            var (unpubSuccess, unpubMessage, unpublishedAds) = _service.CheckUnpublishedAds(login, password, IsBrowserVisible);
+            
+            Core.TerminalLogger.Instance.Log("[CheckAds] Неопубликованные: " + unpubMessage);
 
-            if (ads != null)
+            // 3. Объединяем результаты
+            var allAds = new List<AdData>();
+            if (publishedAds != null) allAds.AddRange(publishedAds);
+            if (unpublishedAds != null) allAds.AddRange(unpublishedAds);
+
+            StatusMessage = $"Найдено {allAds.Count} объявлений ({publishedAds?.Count ?? 0} опубликованных, {unpublishedAds?.Count ?? 0} неопубликованных)";
+            Core.TerminalLogger.Instance.Log($"[CheckAds] Всего найдено: {allAds.Count} объявлений");
+
+            if (allAds.Any())
             {
-                foreach (var ad in ads)
+                foreach (var ad in allAds)
                 {
                     ad.IsSelected = false;
                     FoundAds.Add(ad);
                     // НЕ запускаем таймер для найденных объявлений - только сканируем!
-                    Core.TerminalLogger.Instance.Log(" - " + ad.Title);
+                    var status = ad.IsPublished ? "опубликовано" : "неопубликовано";
+                    Core.TerminalLogger.Instance.Log($" - {ad.Title} ({status})");
                 }
             }
 
             OnPropertyChanged(nameof(FoundAds));
             OnPropertyChanged(nameof(AdsCount));
 
-            if (!success)
+            if (!success && !unpubSuccess)
             {
-                Core.TerminalLogger.Instance.Log("[CheckAds] Проверьте логин/пароль или режим запуска (headless).");
+                Core.TerminalLogger.Instance.Log("[CheckAds] Ошибка при сканировании объявлений. Проверьте логин/пароль или режим запуска (headless).");
+                StatusMessage = "Ошибка при сканировании объявлений";
+            }
+            else if (!success)
+            {
+                Core.TerminalLogger.Instance.Log("[CheckAds] Ошибка при сканировании опубликованных объявлений, но неопубликованные найдены");
+            }
+            else if (!unpubSuccess)
+            {
+                Core.TerminalLogger.Instance.Log("[CheckAds] Ошибка при сканировании неопубликованных объявлений, но опубликованные найдены");
             }
         }
 
@@ -199,6 +223,10 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                     UnpublishMinutes = 30,      // Дефолтные значения
                     RepublishMinutes = 10
                 };
+                
+                // Логируем статус сохраняемого объявления
+                var status = found.IsPublished ? "опубликовано" : "неопубликовано";
+                Core.TerminalLogger.Instance.Log($"[SaveSelected] Сохраняем объявление '{found.Title}' со статусом: {status}");
 
                 await AdManager.Instance.AddAdAsync(newAd);
                 Core.TerminalLogger.Instance.Log($"[SaveSelected] Сохранено в БД: '{newAd.Title}' (Id={newAd.Id}, SiteId={newAd.SiteId}, Published={newAd.IsPublished})");

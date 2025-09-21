@@ -9,6 +9,8 @@ namespace DoskaYkt_AutoManagement.Core
     public class AdScheduler
     {
         private readonly Dictionary<int, Timer> _timers = new();
+        private readonly object _operationLock = new object();
+        private bool _isOperationInProgress = false;
 
         public event Action<Ad> AdPublished;
         public event Action<Ad> AdUnpublished;
@@ -60,28 +62,64 @@ namespace DoskaYkt_AutoManagement.Core
                 {
                     timer.Stop();
 
-                    TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Начинаем снятие с публикации...");
-
-                    // Проверяем текущее состояние на сайте перед снятием
-                    var acc = AccountManager.Instance.SelectedAccount;
-                    if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
+                    // Блокируем одновременные операции
+                    lock (_operationLock)
                     {
-                        var existsOnSite = await DoskaYktService.Instance.ExistsAdOnSiteAsync(acc.Login, acc.Password, ad.SiteId, false, ad.Title);
-                        if (!existsOnSite)
+                        if (_isOperationInProgress)
                         {
-                            TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже снято с сайта, пропускаем операцию");
+                            TerminalLogger.Instance.Log($"[Scheduler] Операция уже выполняется, откладываем '{ad.Title}' на 30 секунд");
+                            // Перезапускаем таймер через 30 секунд
+                            var retryDelay = new Random().Next(10000, 30000); // 10–30 сек
+                            var delayTimer = new Timer(retryDelay);
+                            delayTimer.AutoReset = false;
+                            delayTimer.Elapsed += (ds, de) =>
+                            {
+                                delayTimer.Dispose();
+                                StartForAd(ad);
+                            };
+                            delayTimer.Start();
+                            return;
+                        }
+                        _isOperationInProgress = true;
+                    }
+
+                    try
+                    {
+                        // Случайная задержка от 5 до 15 секунд для предотвращения конфликтов
+                        var randomDelay = new Random().Next(5000, 15000);
+                        TerminalLogger.Instance.Log($"[Scheduler] Ожидание {randomDelay/1000} сек перед операцией для '{ad.Title}'");
+                        await Task.Delay(randomDelay);
+
+                        TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Начинаем снятие с публикации...");
+
+                        // Проверяем текущее состояние на сайте перед снятием
+                        var acc = AccountManager.Instance.SelectedAccount;
+                        if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
+                        {
+                            var existsOnSite = await DoskaYktService.Instance.ExistsAdOnSiteAsync(acc.Login, acc.Password, ad.SiteId, false, ad.Title);
+                            if (!existsOnSite)
+                            {
+                                TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже снято с сайта, пропускаем операцию");
+                                ad.IsPublished = false;
+                                ad.IsPublishedOnSite = false;
+                            }
+                            else
+                            {
+                                AdUnpublishRequested?.Invoke(ad);
+                            }
+                        }
+                        else
+                        {
                             ad.IsPublished = false;
                             ad.IsPublishedOnSite = false;
                         }
-                    else
-                    {
-                        AdUnpublishRequested?.Invoke(ad);
                     }
-                    }
-                    else
+                    finally
                     {
-                        ad.IsPublished = false;
-                        ad.IsPublishedOnSite = false;
+                        lock (_operationLock)
+                        {
+                            _isOperationInProgress = false;
+                        }
                     }
 
                     // Настраиваем дату следующей публикации
@@ -130,28 +168,64 @@ namespace DoskaYkt_AutoManagement.Core
                 {
                     timer.Stop();
 
-                    TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Начинаем публикацию...");
-
-                    // Проверяем текущее состояние на сайте перед публикацией
-                    var acc = AccountManager.Instance.SelectedAccount;
-                    if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
+                    // Блокируем одновременные операции
+                    lock (_operationLock)
                     {
-                        var existsOnSite = await DoskaYktService.Instance.ExistsAdOnSiteAsync(acc.Login, acc.Password, ad.SiteId, false, ad.Title);
-                        if (existsOnSite)
+                        if (_isOperationInProgress)
                         {
-                            TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже опубликовано на сайте, пропускаем операцию");
-                            ad.IsPublished = true;
-                            ad.IsPublishedOnSite = true;
+                            TerminalLogger.Instance.Log($"[Scheduler] Операция уже выполняется, откладываем '{ad.Title}' на 30 секунд");
+                            // Перезапускаем таймер
+                            var retryDelay = new Random().Next(10000, 30000); // 10–30 сек
+                            var delayTimer = new Timer(retryDelay);
+                            delayTimer.AutoReset = false;
+                            delayTimer.Elapsed += (ds, de) =>
+                            {
+                                delayTimer.Dispose();
+                                StartForAd(ad);
+                            };
+                            delayTimer.Start();
+                            return;
+                        }
+                        _isOperationInProgress = true;
+                    }
+
+                    try
+                    {
+                        // Случайная задержка от 5 до 15 секунд для предотвращения конфликтов
+                        var randomDelay = new Random().Next(5000, 15000);
+                        TerminalLogger.Instance.Log($"[Scheduler] Ожидание {randomDelay/1000} сек перед операцией для '{ad.Title}'");
+                        await Task.Delay(randomDelay);
+
+                        TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Начинаем публикацию...");
+
+                        // Проверяем текущее состояние на сайте перед публикацией
+                        var acc = AccountManager.Instance.SelectedAccount;
+                        if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
+                        {
+                            var existsOnSite = await DoskaYktService.Instance.ExistsAdOnSiteAsync(acc.Login, acc.Password, ad.SiteId, false, ad.Title);
+                            if (existsOnSite)
+                            {
+                                TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже опубликовано на сайте, пропускаем операцию");
+                                ad.IsPublished = true;
+                                ad.IsPublishedOnSite = true;
+                            }
+                            else
+                            {
+                                AdPublishRequested?.Invoke(ad);
+                            }
                         }
                         else
                         {
-                            AdPublishRequested?.Invoke(ad);
+                            ad.IsPublished = true;
+                            ad.IsPublishedOnSite = true;
                         }
                     }
-                    else
+                    finally
                     {
-                        ad.IsPublished = true;
-                        ad.IsPublishedOnSite = true;
+                        lock (_operationLock)
+                        {
+                            _isOperationInProgress = false;
+                        }
                     }
 
                     // Настраиваем дату следующего снятия

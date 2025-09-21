@@ -3,6 +3,7 @@ using System.Data;
 using System.Net.Http;
 using System.Windows;
 using System.Drawing;
+using System.IO;
 using Forms = System.Windows.Forms;
 using DoskaYkt_AutoManagement.Core;
 
@@ -17,6 +18,10 @@ namespace DoskaYkt_AutoManagement
         protected override async void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // Обработка необработанных исключений
+            AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+            DispatcherUnhandledException += OnDispatcherUnhandledException;
 
             MainWindow = new MainWindow();
             MainWindow.Closing += (_, __) =>
@@ -153,10 +158,40 @@ namespace DoskaYkt_AutoManagement
             Shutdown(); // т.к. ShutdownMode=OnExplicitShutdown
         }
 
+        private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+        {
+            var exception = e.ExceptionObject as Exception;
+            Core.TerminalLogger.Instance.LogError("Необработанное исключение", exception);
+            
+            // Логируем в файл для отладки
+            try
+            {
+                var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
+                    "DoskaYktAutoManagement", "error.log");
+                Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {exception}\n");
+            }
+            catch { }
+        }
+
+        private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+        {
+            Core.TerminalLogger.Instance.LogError("Исключение в UI потоке", e.Exception);
+            e.Handled = true; // Предотвращаем краш приложения
+        }
+
         protected override void OnExit(ExitEventArgs e)
         {
-            _service.CloseSession();
-            _notifyIcon?.Dispose();
+            try
+            {
+                _service.CloseSession();
+                _notifyIcon?.Dispose();
+                SharedHttpClient?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Core.TerminalLogger.Instance.LogError("Ошибка при завершении приложения", ex);
+            }
             base.OnExit(e);
         }
         public DoskaYktService Service => _service;

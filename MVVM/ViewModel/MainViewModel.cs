@@ -43,8 +43,15 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             {
                 _currentView = value;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(IsHomeViewSelected));
+                OnPropertyChanged(nameof(IsMyADsViewSelected));
+                OnPropertyChanged(nameof(IsMyAccountsViewSelected));
             }
         }
+
+        public bool IsHomeViewSelected => _currentView == HomeVM;
+        public bool IsMyADsViewSelected => _currentView == MyADsVM;
+        public bool IsMyAccountsViewSelected => _currentView == MyAccountsVM;
 
         public MainViewModel()
         {

@@ -11,12 +11,14 @@ namespace DoskaYkt_AutoManagement.Core
 {
     public static class DatabaseHelper
     {
+        // База данных сохраняется в AppData для работы из ProgramFiles без прав администратора
         private static readonly string _dbPath =
             (Environment.GetEnvironmentVariable("ADS_DB_PATH") ??
-             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ads.db"));
+             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
+                         "DoskaYktAutoManagement", "ads.db"));
 
         private static readonly string _connectionString =
-            $"Data Source={_dbPath}";
+            $"Data Source={_dbPath};Cache=Shared;Default Timeout=30";
 
         static DatabaseHelper()
         {
@@ -26,13 +28,15 @@ namespace DoskaYkt_AutoManagement.Core
 
         private static void InitializeDatabase()
         {
-            // Ensure directory exists
-            var dir = Path.GetDirectoryName(_dbPath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
+            try
+            {
+                // Ensure directory exists
+                var dir = Path.GetDirectoryName(_dbPath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
 
-            using var connection = new SqliteConnection(_connectionString);
-            connection.Open();
+                using var connection = new SqliteConnection(_connectionString);
+                connection.Open();
 
             var command = connection.CreateCommand();
             command.CommandText = @"
@@ -120,6 +124,13 @@ namespace DoskaYkt_AutoManagement.Core
                 command.CommandText = "ALTER TABLE Announcements ADD COLUMN NextRepublishAt TEXT NULL;";
                 try { command.ExecuteNonQuery(); } catch { }
             }
+            }
+            catch (Exception ex)
+            {
+                // Логируем ошибку инициализации БД
+                System.Diagnostics.Debug.WriteLine($"[DatabaseHelper] Ошибка инициализации БД: {ex.Message}");
+                throw;
+            }
         }
 
         // ==================
@@ -146,6 +157,11 @@ namespace DoskaYkt_AutoManagement.Core
 
         public static async Task<int> AddAccountAsync(string login, string password, bool isCurrent = false)
         {
+            if (string.IsNullOrWhiteSpace(login))
+                throw new ArgumentException("Логин не может быть пустым", nameof(login));
+            if (string.IsNullOrWhiteSpace(password))
+                throw new ArgumentException("Пароль не может быть пустым", nameof(password));
+
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync().ConfigureAwait(false);
 

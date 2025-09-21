@@ -56,6 +56,13 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         }
 
         private readonly DoskaYktService _siteService = DoskaYktService.Instance;
+        
+        private bool _isOperationInProgress;
+        public bool IsOperationInProgress
+        {
+            get => _isOperationInProgress;
+            set => SetProperty(ref _isOperationInProgress, value);
+        }
 
         public MyADsViewModel()
         {
@@ -85,13 +92,21 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                         ad.IsPublishedOnSite = false;
                         TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' снято.");
                         await AdManager.Instance.UpdateAdAsync(ad);
+                        
+                        // Небольшая задержка перед перезапуском таймера
+                        await Task.Delay(2000);
+                        
                         // Перезапускаем таймер для следующего цикла (публикация)
                         AdScheduler.Instance.StartForAd(ad);
                     }
                     else
                     {
                         TerminalLogger.Instance.Log($"[Scheduler] Не удалось снять '{ad.Title}' с сайта");
-                        // При ошибке снятия все равно перезапускаем таймер для повторной попытки
+                        
+                        // При ошибке снятия ждем дольше перед повторной попыткой
+                        await Task.Delay(10000);
+                        
+                        // Перезапускаем таймер для повторной попытки
                         AdScheduler.Instance.StartForAd(ad);
                     }
                 }
@@ -122,13 +137,21 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                         ad.IsPublishedOnSite = true;
                         TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' опубликовано.");
                         await AdManager.Instance.UpdateAdAsync(ad);
+                        
+                        // Небольшая задержка перед перезапуском таймера
+                        await Task.Delay(2000);
+                        
                         // Перезапускаем таймер для следующего цикла (снятие)
                         AdScheduler.Instance.StartForAd(ad);
                     }
                     else
                     {
                         TerminalLogger.Instance.Log($"[Scheduler] Не удалось опубликовать '{ad.Title}' на сайте");
-                        // При ошибке публикации все равно перезапускаем таймер для повторной попытки
+                        
+                        // При ошибке публикации ждем дольше перед повторной попыткой
+                        await Task.Delay(10000);
+                        
+                        // Перезапускаем таймер для повторной попытки
                         AdScheduler.Instance.StartForAd(ad);
                     }
                 }
@@ -167,9 +190,9 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 
         private void ApplyUnpublishTimer()
         {
-            if (UnpublishMinutesInput <= 0)
+            if (UnpublishMinutesInput <= 0 || UnpublishMinutesInput > 1440) // Максимум 24 часа
             {
-                TerminalLogger.Instance.Log("[Timers] Неверный интервал снятия. Таймер не будет установлен.");
+                TerminalLogger.Instance.Log("[Timers] Неверный интервал снятия (должен быть от 1 до 1440 минут). Таймер не будет установлен.");
                 return;
             }
 
@@ -205,9 +228,9 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 
         private void ApplyPublishTimer()
         {
-            if (PublishMinutesInput <= 0)
+            if (PublishMinutesInput <= 0 || PublishMinutesInput > 1440) // Максимум 24 часа
             {
-                TerminalLogger.Instance.Log("[Timers] Неверный интервал публикации. Таймер не будет установлен.");
+                TerminalLogger.Instance.Log("[Timers] Неверный интервал публикации (должен быть от 1 до 1440 минут). Таймер не будет установлен.");
                 return;
             }
 
@@ -277,6 +300,41 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             TerminalLogger.Instance.Log("[StartAll] Все таймеры запущены");
         }
 
+        /// <summary>
+        /// Принудительно синхронизирует статус конкретного объявления
+        /// </summary>
+        public async Task SyncAdStatusAsync(Ad ad)
+        {
+            if (ad == null || string.IsNullOrEmpty(ad.SiteId)) return;
+
+            var acc = AccountManager.Instance.SelectedAccount;
+            if (acc == null) return;
+
+            try
+            {
+                TerminalLogger.Instance.Log($"[SyncAd] Синхронизация статуса '{ad.Title}'...");
+                
+                var existsOnSite = await _siteService.ExistsAdOnSiteAsync(acc.Login, acc.Password, ad.SiteId, false, ad.Title);
+                bool wasPublished = ad.IsPublished;
+                ad.IsPublished = existsOnSite;
+                ad.IsPublishedOnSite = existsOnSite;
+                
+                if (wasPublished != ad.IsPublished)
+                {
+                    TerminalLogger.Instance.Log($"[SyncAd] Статус '{ad.Title}' изменен: {wasPublished} -> {ad.IsPublished}");
+                    await AdManager.Instance.UpdateAdAsync(ad);
+                }
+                else
+                {
+                    TerminalLogger.Instance.Log($"[SyncAd] Статус '{ad.Title}' не изменился: {ad.IsPublished}");
+                }
+            }
+            catch (Exception ex)
+            {
+                TerminalLogger.Instance.Log($"[SyncAd] Ошибка синхронизации '{ad.Title}': {ex.Message}");
+            }
+        }
+
 
         private async void OnAdRepostRequested(Ad ad)
         {
@@ -338,6 +396,10 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 return;
             }
 
+            IsOperationInProgress = true;
+            try
+            {
+
             foreach (var ad in selected)
             {
                 try
@@ -367,6 +429,11 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 {
                     TerminalLogger.Instance.Log($"[Bump] Ошибка: {ex.Message}");
                 }
+            }
+            }
+            finally
+            {
+                IsOperationInProgress = false;
             }
         }
 

@@ -5,6 +5,9 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
+using OpenQA.Selenium;
+using OpenQA.Selenium.Support.UI;
 
 namespace DoskaYkt_AutoManagement.Core
 {
@@ -164,24 +167,37 @@ namespace DoskaYkt_AutoManagement.Core
                 return;
             }
 
-            TerminalLogger.Instance.Log("[Sync] Начинаем синхронизацию с сайтом...");
+            TerminalLogger.Instance.Log("[Sync] Начинаем полную синхронизацию с сайтом...");
             
             try
             {
-                var (success, message, siteAds) = DoskaYktService.Instance.CheckAds(acc.Login, acc.Password, false);
+                // 1. Проверяем опубликованные объявления
+                TerminalLogger.Instance.Log("[Sync] Проверяем опубликованные объявления...");
+                var (success, message, publishedAds) = DoskaYktService.Instance.CheckAds(acc.Login, acc.Password, false);
                 
                 if (!success)
                 {
-                    TerminalLogger.Instance.Log($"[Sync] Ошибка синхронизации: {message}");
+                    TerminalLogger.Instance.Log($"[Sync] Ошибка при проверке опубликованных: {message}");
                     return;
                 }
+
+                // 2. Проверяем неопубликованные объявления
+                TerminalLogger.Instance.Log("[Sync] Проверяем неопубликованные объявления...");
+                var (unpubSuccess, unpubMessage, unpublishedAds) = DoskaYktService.Instance.CheckUnpublishedAds(acc.Login, acc.Password, false);
+
+                // Объединяем все объявления с сайта
+                var allSiteAds = new List<AdData>();
+                if (publishedAds != null) allSiteAds.AddRange(publishedAds);
+                if (unpublishedAds != null) allSiteAds.AddRange(unpublishedAds);
+
+                TerminalLogger.Instance.Log($"[Sync] Найдено {allSiteAds.Count} объявлений на сайте ({publishedAds?.Count ?? 0} опубликованных, {unpublishedAds?.Count ?? 0} неопубликованных)");
 
                 // Обновляем статус объявлений на основе данных с сайта
                 foreach (var ad in Ads)
                 {
                     if (string.IsNullOrEmpty(ad.SiteId)) continue;
                     
-                    var siteAd = siteAds?.FirstOrDefault(sa => sa.Id == ad.SiteId || sa.SiteId == ad.SiteId);
+                    var siteAd = allSiteAds.FirstOrDefault(sa => sa.Id == ad.SiteId || sa.SiteId == ad.SiteId);
                     if (siteAd != null)
                     {
                         bool wasPublished = ad.IsPublished;
@@ -194,15 +210,27 @@ namespace DoskaYkt_AutoManagement.Core
                             await UpdateAdAsync(ad);
                         }
                     }
+                    else
+                    {
+                        // Объявление есть в БД, но нет на сайте - возможно было удалено
+                        if (ad.IsPublished)
+                        {
+                            TerminalLogger.Instance.Log($"[Sync] Объявление '{ad.Title}' не найдено на сайте, помечаем как неопубликованное");
+                            ad.IsPublished = false;
+                            ad.IsPublishedOnSite = false;
+                            await UpdateAdAsync(ad);
+                        }
+                    }
                 }
                 
-                TerminalLogger.Instance.Log("[Sync] Синхронизация завершена");
+                TerminalLogger.Instance.Log("[Sync] Полная синхронизация завершена");
             }
             catch (Exception ex)
             {
                 TerminalLogger.Instance.Log($"[Sync] Ошибка при синхронизации: {ex.Message}");
             }
         }
+
 
         // Для работы с сайтом используйте DoskaYktService через ViewModel
     }

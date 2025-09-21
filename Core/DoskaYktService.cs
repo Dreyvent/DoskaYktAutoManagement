@@ -64,12 +64,15 @@ namespace DoskaYkt_AutoManagement.Core
             { 
                 TerminalLogger.Instance.Log($"[Session] Ошибка при закрытии браузера: {ex.Message}");
             }
-            try { _driver?.Dispose(); } catch { }
-            _driver = null;
-            _wait = null;
-            _isLoggedIn = false;
-            _currentLogin = null;
-            TryKillLeftoverDrivers();
+            finally
+            {
+                try { _driver?.Dispose(); } catch { }
+                _driver = null;
+                _wait = null;
+                _isLoggedIn = false;
+                _currentLogin = null;
+                TryKillLeftoverDrivers();
+            }
         }
 
         private void TryKillLeftoverDrivers()
@@ -115,7 +118,12 @@ namespace DoskaYkt_AutoManagement.Core
                 
                 _driver = new ChromeDriver(service, options);
                 _lastDriverKind = "chrome";
-                _wait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(500));
+                _wait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(500));
+                
+                // Устанавливаем таймауты для стабильности
+                _driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
+                _driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(60);
+                _driver.Manage().Timeouts().AsynchronousJavaScript = TimeSpan.FromSeconds(30);
                 
                 TerminalLogger.Instance.Log($"[Session] ChromeDriver создан (HideCMD={Properties.Settings.Default.HideDriverWindow})");
             }
@@ -169,11 +177,10 @@ namespace DoskaYkt_AutoManagement.Core
                 var ads = new List<AdData>();
                 try
                 {
-                    using var driver = _driver;
-                    var wait = new WebDriverWait(new SystemClock(), driver, TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(250));
-                    driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
+                    var wait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(250));
+                    _driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
                     wait.Until(d => d.FindElements(By.CssSelector("div.d-post_desc")).Any());
-                    foreach (var el in driver.FindElements(By.CssSelector("div.d-post_desc")))
+                    foreach (var el in _driver.FindElements(By.CssSelector("div.d-post_desc")))
                     {
                         if (cancellationToken.IsCancellationRequested) break;
                         ads.Add(new AdData { Title = el.Text.Trim() });
@@ -235,6 +242,7 @@ namespace DoskaYkt_AutoManagement.Core
                 var profileWait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(300));
 
                 bool listReady = false;
+                bool isEmpty = false;
                 try
                 {
                     // Ждём готовность документа
@@ -246,12 +254,24 @@ namespace DoskaYkt_AutoManagement.Core
                         }
                         catch { return false; }
                     });
-                    // Ждём любой из селекторов списка
-                    profileWait.Until(d =>
+                    
+                    // Проверяем, есть ли сообщение о пустом списке
+                    var emptyMessage = _driver.FindElements(By.CssSelector("div.d-pc_no_posts_title"));
+                    if (emptyMessage.Any())
                     {
-                        return d.FindElements(By.CssSelector("div.d-post_desc, a.d-post_link, div.d-post")).Any();
-                    });
-                    listReady = true;
+                        Core.TerminalLogger.Instance.Log("[CheckAds] Список объявлений пуст - найдено сообщение 'У вас пока нет объявлений'");
+                        isEmpty = true;
+                        listReady = true;
+                    }
+                    else
+                    {
+                        // Ждём любой из селекторов списка объявлений
+                        profileWait.Until(d =>
+                        {
+                            return d.FindElements(By.CssSelector("div.d-post_desc, a.d-post_link, div.d-post")).Any();
+                        });
+                        listReady = true;
+                    }
                 }
                 catch (WebDriverTimeoutException)
                 {
@@ -263,9 +283,16 @@ namespace DoskaYkt_AutoManagement.Core
                     }
                     catch { }
                 }
+                
                 if (!listReady)
                 {
                     return (false, "Не удалось загрузить список объявлений (timeout).", ads);
+                }
+                
+                if (isEmpty)
+                {
+                    Core.TerminalLogger.Instance.Log("[CheckAds] Список объявлений пуст, возвращаем пустой результат");
+                    return (true, "Список объявлений пуст", ads);
                 }
                 // Собираем объявления только из профиля
                 var adElements = _driver.FindElements(By.CssSelector("div.d-post_desc"));
@@ -490,6 +517,15 @@ namespace DoskaYkt_AutoManagement.Core
                     Core.TerminalLogger.Instance.Log("[ExistsAd] Открываем профиль /profile/posts");
                     _driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
                     _wait.Until(d => { try { return ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").ToString() == "complete"; } catch { return false; } });
+                    
+                    // Проверяем, есть ли сообщение о пустом списке
+                    var emptyMessage = _driver.FindElements(By.CssSelector("div.d-pc_no_posts_title"));
+                    if (emptyMessage.Any())
+                    {
+                        Core.TerminalLogger.Instance.Log("[ExistsAd] Список объявлений пуст, объявление не найдено");
+                        return false;
+                    }
+                    
                     _wait.Until(d => d.FindElements(By.CssSelector(".d-post"))?.Any() == true);
 
                     // Если adId не цифры — пытаемся найти по заголовку
@@ -525,6 +561,15 @@ namespace DoskaYkt_AutoManagement.Core
                     Core.TerminalLogger.Instance.Log("[Unpublish] Открываем профиль /profile/posts");
                     _driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
                     _wait.Until(d => { try { return ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").ToString() == "complete"; } catch { return false; } });
+                    
+                    // Проверяем, есть ли сообщение о пустом списке
+                    var emptyMessage = _driver.FindElements(By.CssSelector("div.d-pc_no_posts_title"));
+                    if (emptyMessage.Any())
+                    {
+                        Core.TerminalLogger.Instance.Log("[Unpublish] Список объявлений пуст, нечего снимать с публикации");
+                        return false;
+                    }
+                    
                     _wait.Until(d => d.FindElements(By.CssSelector(".d-post"))?.Any() == true);
 
                     string idToUse = Regex.IsMatch(adId ?? string.Empty, @"^\d+$") ? adId : null;
@@ -554,21 +599,44 @@ namespace DoskaYkt_AutoManagement.Core
                             ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].scrollIntoView({block:'center'});", btn);
                             btn.Click();
 
-                            // Проверяем, есть ли радиокнопки причин
-                            var reasons = _driver.FindElements(By.CssSelector("input[name='reason_code']"));
-                            if (reasons.Any())
+                            // Ждем появления модального окна
+                            try
                             {
-                                // ищем "Пропустить вопрос"
-                                var skipReason = reasons.FirstOrDefault(r => r.GetAttribute("value") == "310");
-                                if (skipReason != null)
+                                _wait.Until(d => d.FindElements(By.CssSelector("input[name='reason_code']")).Any());
+                                
+                                // Проверяем, есть ли радиокнопки причин
+                                var reasons = _driver.FindElements(By.CssSelector("input[name='reason_code']"));
+                                if (reasons.Any())
                                 {
-                                    ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", skipReason);
+                                    // ищем "Пропустить вопрос" по значению 310
+                                    var skipReason = reasons.FirstOrDefault(r => r.GetAttribute("value") == "310");
+                                    if (skipReason != null)
+                                    {
+                                        TerminalLogger.Instance.Log($"[Unpublish] Найдена опция 'Пропустить вопрос' для объявления {idToUse}");
+                                        ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", skipReason);
+                                    }
+                                    else
+                                    {
+                                        // если "пропустить" нет, ищем по тексту
+                                        var skipByText = _driver.FindElements(By.XPath("//label[contains(text(), 'Пропустить') or contains(text(), 'пропустить')]//input[@name='reason_code']")).FirstOrDefault();
+                                        if (skipByText != null)
+                                        {
+                                            TerminalLogger.Instance.Log($"[Unpublish] Найдена опция 'Пропустить' по тексту для объявления {idToUse}");
+                                            ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", skipByText);
+                                        }
+                                        else
+                                        {
+                                            // если ничего не найдено, просто берём первый вариант
+                                            TerminalLogger.Instance.Log($"[Unpublish] Опция 'Пропустить' не найдена, выбираем первый вариант для объявления {idToUse}");
+                                            ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", reasons.First());
+                                        }
+                                    }
                                 }
-                                else
-                                {
-                                    // если "пропустить" нет, просто берём первый вариант
-                                    ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", reasons.First());
-                                }
+                            }
+                            catch (WebDriverTimeoutException)
+                            {
+                                TerminalLogger.Instance.Log($"[Unpublish] Модальное окно не появилось для объявления {idToUse}");
+                                return false;
                             }
 
                             // Подтверждение в модалке
@@ -766,6 +834,70 @@ namespace DoskaYkt_AutoManagement.Core
                     return (false, ex.Message, null);
                 }
             }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Проверяет неопубликованные объявления на сайте
+        /// </summary>
+        public (bool success, string message, List<AdData> ads) CheckUnpublishedAds(string login, string password, bool showChrome, CancellationToken cancellationToken = default)
+        {
+            var ads = new List<AdData>();
+            try
+            {
+                EnsureSession(showChrome);
+                EnsureLoggedIn(login, password);
+
+                TerminalLogger.Instance.Log("[CheckUnpublished] Открываем страницу неопубликованных объявлений...");
+                _driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts/finished");
+                
+                var wait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(500));
+                
+                // Проверяем, есть ли сообщение о пустом списке
+                var emptyMessage = _driver.FindElements(By.CssSelector("div.d-pc_no_posts_title"));
+                if (emptyMessage.Any())
+                {
+                    TerminalLogger.Instance.Log("[CheckUnpublished] Список неопубликованных объявлений пуст");
+                    return (true, "Список неопубликованных объявлений пуст", ads);
+                }
+                
+                wait.Until(d => d.FindElements(By.CssSelector(".d-post")).Any());
+
+                var adElements = _driver.FindElements(By.CssSelector(".d-post"));
+
+                foreach (var descEl in adElements)
+                {
+                    if (cancellationToken.IsCancellationRequested) break;
+                    
+                    try
+                    {
+                        var titleEl = descEl.FindElements(By.CssSelector(".d-post_desc")).FirstOrDefault();
+                        var title = titleEl?.Text?.Trim() ?? string.Empty;
+
+                        string adId = null;
+                        var linkEl = descEl.FindElements(By.CssSelector("a.d-post_link")).FirstOrDefault();
+                        if (linkEl != null)
+                        {
+                            var href = linkEl.GetAttribute("href") ?? string.Empty;
+                            var mHref = Regex.Match(href, @"/(\d+)$");
+                            if (mHref.Success) adId = mHref.Groups[1].Value;
+                        }
+
+                        if (!string.IsNullOrEmpty(adId) && !string.IsNullOrEmpty(title))
+                        {
+                            ads.Add(new AdData { Id = adId, Title = title, IsPublished = false });
+                        }
+                    }
+                    catch { }
+                }
+
+                TerminalLogger.Instance.Log($"[CheckUnpublished] Найдено {ads.Count} неопубликованных объявлений");
+                return (true, $"Найдено {ads.Count} неопубликованных объявлений", ads);
+            }
+            catch (Exception ex)
+            {
+                TerminalLogger.Instance.Log($"[CheckUnpublished] Ошибка → {ex.Message}");
+                return (false, $"Ошибка при проверке неопубликованных объявлений: {ex.Message}", ads);
+            }
         }
     }
 }
