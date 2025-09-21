@@ -45,6 +45,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="auto"/>
                             <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="auto"/>
                             <ColumnDefinition Width="1*" />
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
@@ -101,6 +102,24 @@
                             <ComboBoxItem Content="Chrome"/>
                             <ComboBoxItem Content="Firefox"/>
                         </ComboBox>
+                        <TextBlock Grid.Row="1" 
+                                   Grid.Column="2" 
+                                   Text="Скрыть CMD драйвера:" 
+                                   VerticalAlignment="Center" 
+                                   Foreground="White" 
+                                   FontSize="16" 
+                                   Margin="10,0,5,0"/>
+                        <ToggleButton Grid.Column="3" 
+                                      Grid.Row="1" 
+                                      HorizontalAlignment="Left" 
+                                      x:Name="HideDriverToggle" 
+                                      Content="Да" 
+                                      Width="60" 
+                                      Height="30" 
+                                      IsChecked="{Binding HideDriverWindow, Mode=TwoWay}" 
+                                      Background="Gray" 
+                                      Foreground="White" 
+                                      ToolTip="Скрыть окно командной строки драйвера Selenium"/>
                     </Grid>
                 </StackPanel>
             </Border>

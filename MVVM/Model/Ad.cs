@@ -36,6 +36,12 @@ namespace DoskaYkt_AutoManagement.MVVM.Model
         private DateTime? _nextRepublishAt;
         public DateTime? NextRepublishAt { get => _nextRepublishAt; set => SetProperty(ref _nextRepublishAt, value); }
 
+        private int _unpublishMinutes = 10;
+        public int UnpublishMinutes { get => _unpublishMinutes; set => SetProperty(ref _unpublishMinutes, value); }
+
+        private int _republishMinutes = 20;
+        public int RepublishMinutes { get => _republishMinutes; set => SetProperty(ref _republishMinutes, value); }
+
         private bool _isSelected;
         public bool IsSelected { get => _isSelected; set => SetProperty(ref _isSelected, value); }
 
@@ -44,6 +50,13 @@ namespace DoskaYkt_AutoManagement.MVVM.Model
         {
             get => _isPublished;
             set => SetProperty(ref _isPublished, value);
+        }
+
+        private bool _isPublishedOnSite;
+        public bool IsPublishedOnSite
+        {
+            get => _isPublishedOnSite;
+            set => SetProperty(ref _isPublishedOnSite, value);
         }
     }
 }

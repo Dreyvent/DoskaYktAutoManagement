@@ -58,5 +58,17 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["RepublishDelayMinutes"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool HideDriverWindow {
+            get {
+                return ((bool)(this["HideDriverWindow"]));
+            }
+            set {
+                this["HideDriverWindow"] = value;
+            }
+        }
     }
 }

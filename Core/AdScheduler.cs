@@ -25,56 +25,153 @@ namespace DoskaYkt_AutoManagement.Core
         public void StartForAd(Ad ad)
         {
             StopForAd(ad.Id);
-            // НЕ запускаем перепубликацию сразу - только планируем таймеры
+
+            if (!ad.IsAutoRaiseEnabled)
+            {
+                TerminalLogger.Instance.Log($"[Scheduler] Автоматический режим отключен для '{ad.Title}'. Таймер не запущен.");
+                return;
+            }
+
+            double delay;
 
             if (ad.IsPublished)
             {
-                if (ad.NextUnpublishAt == null)
-                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(30); // дефолт
+                if (ad.UnpublishMinutes <= 0)
+                {
+                    TerminalLogger.Instance.Log($"[Scheduler] Для '{ad.Title}' не задан таймер снятия. Цикл остановлен.");
+                    return;
+                }
+                // Таймер снятия
+                if (ad.NextUnpublishAt != null && ad.NextUnpublishAt.Value > DateTime.Now)
+                {
+                    delay = (ad.NextUnpublishAt.Value - DateTime.Now).TotalMilliseconds;
+                }
+                else
+                {
+                    delay = ad.UnpublishMinutes * 60 * 1000;
+                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(ad.UnpublishMinutes);
+                }
 
-                var delay = (ad.NextUnpublishAt.Value - DateTime.Now).TotalMilliseconds;
-                if (delay < 0) delay = 1000; // защита
+                if (delay < 1000) delay = 1000; // защита от слишком маленького или отрицательного значения
 
                 var timer = new Timer(delay);
-                timer.Elapsed += (s, e) =>
+                timer.AutoReset = false;
+                timer.Elapsed += async (s, e) =>
                 {
                     timer.Stop();
-                    ad.IsPublished = false;
-                    ad.NextUnpublishAt = null;
-                    ad.NextRepublishAt = DateTime.Now.AddMinutes(10);
 
-                    AdUnpublished?.Invoke(ad);
-                    // НЕ вызываем AdUnpublishRequested - это снимает объявление с сайта!
-                    StartForAd(ad); // перезапуск на следующий цикл
+                    TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Начинаем снятие с публикации...");
+
+                    // Проверяем текущее состояние на сайте перед снятием
+                    var acc = AccountManager.Instance.SelectedAccount;
+                    if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
+                    {
+                        var existsOnSite = await DoskaYktService.Instance.ExistsAdOnSiteAsync(acc.Login, acc.Password, ad.SiteId, false, ad.Title);
+                        if (!existsOnSite)
+                        {
+                            TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже снято с сайта, пропускаем операцию");
+                            ad.IsPublished = false;
+                            ad.IsPublishedOnSite = false;
+                        }
+                    else
+                    {
+                        AdUnpublishRequested?.Invoke(ad);
+                    }
+                    }
+                    else
+                    {
+                        ad.IsPublished = false;
+                        ad.IsPublishedOnSite = false;
+                    }
+
+                    // Настраиваем дату следующей публикации
+                    if (ad.RepublishMinutes > 0)
+                    {
+                        ad.NextRepublishAt = DateTime.Now.AddMinutes(ad.RepublishMinutes);
+                        ad.NextUnpublishAt = null;
+                    }
+                    else
+                    {
+                        ad.NextRepublishAt = null;
+                        ad.NextUnpublishAt = null;
+                    }
+
+                    // Обновляем в БД
+                    await AdManager.Instance.UpdateAdAsync(ad);
+
+                    // Таймер будет перезапущен из ViewModel после выполнения действия
                 };
-                timer.AutoReset = false;
                 timer.Start();
-
                 _timers[ad.Id] = timer;
             }
             else
             {
-                if (ad.NextRepublishAt == null)
-                    ad.NextRepublishAt = DateTime.Now.AddMinutes(10); // дефолт
+                if (ad.RepublishMinutes <= 0)
+                {
+                    TerminalLogger.Instance.Log($"[Scheduler] Для '{ad.Title}' не задан таймер публикации. Цикл остановлен.");
+                    return;
+                }
+                // Таймер публикации
+                if (ad.NextRepublishAt != null && ad.NextRepublishAt.Value > DateTime.Now)
+                {
+                    delay = (ad.NextRepublishAt.Value - DateTime.Now).TotalMilliseconds;
+                }
+                else
+                {
+                    delay = ad.RepublishMinutes * 60 * 1000;
+                    ad.NextRepublishAt = DateTime.Now.AddMinutes(ad.RepublishMinutes);
+                }
 
-                var delay = (ad.NextRepublishAt.Value - DateTime.Now).TotalMilliseconds;
-                if (delay < 0) delay = 1000; // защита
+                if (delay < 1000) delay = 1000; // защита
 
                 var timer = new Timer(delay);
-                timer.Elapsed += (s, e) =>
+                timer.AutoReset = false;
+                timer.Elapsed += async (s, e) =>
                 {
                     timer.Stop();
-                    ad.IsPublished = true;
-                    ad.NextRepublishAt = null;
-                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(30);
 
-                    AdPublished?.Invoke(ad);
-                    // НЕ вызываем AdPublishRequested - это публикует объявление на сайте!
-                    StartForAd(ad); // перезапуск
+                    TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Начинаем публикацию...");
+
+                    // Проверяем текущее состояние на сайте перед публикацией
+                    var acc = AccountManager.Instance.SelectedAccount;
+                    if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
+                    {
+                        var existsOnSite = await DoskaYktService.Instance.ExistsAdOnSiteAsync(acc.Login, acc.Password, ad.SiteId, false, ad.Title);
+                        if (existsOnSite)
+                        {
+                            TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже опубликовано на сайте, пропускаем операцию");
+                            ad.IsPublished = true;
+                            ad.IsPublishedOnSite = true;
+                        }
+                        else
+                        {
+                            AdPublishRequested?.Invoke(ad);
+                        }
+                    }
+                    else
+                    {
+                        ad.IsPublished = true;
+                        ad.IsPublishedOnSite = true;
+                    }
+
+                    // Настраиваем дату следующего снятия
+                    if (ad.UnpublishMinutes > 0)
+                    {
+                        ad.NextUnpublishAt = DateTime.Now.AddMinutes(ad.UnpublishMinutes);
+                        ad.NextRepublishAt = null;
+                    }
+                    else
+                    {
+                        ad.NextUnpublishAt = null;
+                        ad.NextRepublishAt = null;
+                    }
+
+                    // Обновляем в БД
+                    await AdManager.Instance.UpdateAdAsync(ad);
+
+                    // Таймер будет перезапущен из ViewModel после выполнения действия
                 };
-                timer.AutoReset = false;
                 timer.Start();
-
                 _timers[ad.Id] = timer;
             }
         }
@@ -94,25 +191,16 @@ namespace DoskaYkt_AutoManagement.Core
             StopForAd(ad.Id);
         }
 
-        /// <summary>
-        /// Запустить перепубликацию объявления (только когда это действительно нужно)
-        /// </summary>
         public void StartRepostForAd(Ad ad)
         {
             AdRepostRequested?.Invoke(ad);
         }
 
-        /// <summary>
-        /// БЕЗОПАСНО снять объявление с публикации на сайте (только когда явно запрошено)
-        /// </summary>
         public void UnpublishAdOnSite(Ad ad)
         {
             AdUnpublishRequested?.Invoke(ad);
         }
 
-        /// <summary>
-        /// БЕЗОПАСНО опубликовать объявление на сайте (только когда явно запрошено)
-        /// </summary>
         public void PublishAdOnSite(Ad ad)
         {
             AdPublishRequested?.Invoke(ad);
@@ -122,10 +210,29 @@ namespace DoskaYkt_AutoManagement.Core
         {
             foreach (var kvp in _timers)
             {
-                kvp.Value.Stop();
-                kvp.Value.Dispose();
+                try
+                {
+                    kvp.Value.Stop();
+                    kvp.Value.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    TerminalLogger.Instance.Log($"[Scheduler] Ошибка при остановке таймера {kvp.Key}: {ex.Message}");
+                }
             }
             _timers.Clear();
+            TerminalLogger.Instance.Log("[Scheduler] Все таймеры остановлены.");
+        }
+
+        public void RestartAllTimers()
+        {
+            TerminalLogger.Instance.Log("[Scheduler] Перезапуск всех таймеров...");
+            var ads = AdManager.Instance.Ads.Where(ad => ad.IsAutoRaiseEnabled).ToList();
+            foreach (var ad in ads)
+            {
+                StartForAd(ad);
+            }
+            TerminalLogger.Instance.Log($"[Scheduler] Перезапущено {ads.Count} таймеров.");
         }
     }
 }

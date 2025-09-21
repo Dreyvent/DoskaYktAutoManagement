@@ -30,7 +30,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
                     .InformationalVersion
                     .Split('+')[0] ?? "Unknown";
-                return $"Version {version} Alpha";
+                return $"Version {version} Beta";
             }
         }
 

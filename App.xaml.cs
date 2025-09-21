@@ -29,14 +29,17 @@ namespace DoskaYkt_AutoManagement
             {
                 try
                 {
-                    MainWindow.Dispatcher.Invoke(() => ((MainWindow)MainWindow).AppendLog(line));
+                    if (MainWindow != null && MainWindow.Dispatcher != null)
+                    {
+                        MainWindow.Dispatcher.Invoke(() => ((MainWindow)MainWindow).AppendLog(line));
+                    }
                 }
                 catch { }
             };
 
             _notifyIcon = new Forms.NotifyIcon
             {
-                Icon = new System.Drawing.Icon("Images/DoskaYkt-AutoCreator-Favicon3.ico"),
+                Icon = new System.Drawing.Icon("Images/DoskaYkt-Favicon3.ico"),
                 Text = "DoskaYkt AutoManagement",
                 Visible = false
             };

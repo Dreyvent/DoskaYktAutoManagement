@@ -35,9 +35,11 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         public RelayCommand ClearSelectionCommand { get; }
 
         public RelayCommand ApplyUnpublishTimerCommand { get; }
-        public RelayCommand RemoveUnpublishTimerCommand { get; }
+        public RelayCommand RemoveTimersCommand { get; }
         public RelayCommand ApplyPublishTimerCommand { get; }
-        public RelayCommand RemovePublishTimerCommand { get; }
+        public RelayCommand RestartTimersCommand { get; }
+        public AsyncRelayCommand SyncWithSiteCommand { get; }
+        public AsyncRelayCommand StartAllCommand { get; }
 
         private int _unpublishMinutesInput;
         public int UnpublishMinutesInput
@@ -65,31 +67,76 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 
             AdScheduler.Instance.AdUnpublishRequested += async ad =>
             {
-                var acc = AccountManager.Instance.SelectedAccount;
-                if (acc == null) return;
-
-                TerminalLogger.Instance.Log($"[Scheduler] Снятие '{ad.Title}'...");
-                var ok = await _siteService.UnpublishAdAsync(acc.Login, acc.Password, ad.SiteId, true, ad.Title);
-                if (ok)
+                try
                 {
-                    ad.IsPublished = false;
-                    TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' снято.");
-                    AdScheduler.Instance.StartForAd(ad); // ставим следующий (публикацию)
+                    var acc = AccountManager.Instance.SelectedAccount;
+                    if (acc == null) 
+                    {
+                        TerminalLogger.Instance.Log($"[Scheduler] Нет выбранного аккаунта для снятия '{ad.Title}'");
+                        return;
+                    }
+
+                    TerminalLogger.Instance.Log($"[Scheduler] Снятие '{ad.Title}'...");
+                    var ok = await _siteService.UnpublishAdAsync(acc.Login, acc.Password, ad.SiteId, true, ad.Title);
+
+                    if (ok)
+                    {
+                        ad.IsPublished = false;
+                        ad.IsPublishedOnSite = false;
+                        TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' снято.");
+                        await AdManager.Instance.UpdateAdAsync(ad);
+                        // Перезапускаем таймер для следующего цикла (публикация)
+                        AdScheduler.Instance.StartForAd(ad);
+                    }
+                    else
+                    {
+                        TerminalLogger.Instance.Log($"[Scheduler] Не удалось снять '{ad.Title}' с сайта");
+                        // При ошибке снятия все равно перезапускаем таймер для повторной попытки
+                        AdScheduler.Instance.StartForAd(ad);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    TerminalLogger.Instance.Log($"[Scheduler] Ошибка при снятии '{ad.Title}': {ex.Message}");
+                    // При исключении перезапускаем таймер для повторной попытки
+                    AdScheduler.Instance.StartForAd(ad);
                 }
             };
 
             AdScheduler.Instance.AdPublishRequested += async ad =>
             {
-                var acc = AccountManager.Instance.SelectedAccount;
-                if (acc == null) return;
-
-                TerminalLogger.Instance.Log($"[Scheduler] Публикация '{ad.Title}'...");
-                var ok = await _siteService.RepublishAdAsync(acc.Login, acc.Password, ad.SiteId, true);
-                if (ok)
+                try
                 {
-                    ad.IsPublished = true;
-                    TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' опубликовано.");
-                    AdScheduler.Instance.StartForAd(ad); // ставим следующий (снятие)
+                    var acc = AccountManager.Instance.SelectedAccount;
+                    if (acc == null) 
+                    {
+                        TerminalLogger.Instance.Log($"[Scheduler] Нет выбранного аккаунта для публикации '{ad.Title}'");
+                        return;
+                    }
+
+                    TerminalLogger.Instance.Log($"[Scheduler] Публикация '{ad.Title}'...");
+                    var ok = await _siteService.RepublishAdAsync(acc.Login, acc.Password, ad.SiteId, true);
+                    if (ok)
+                    {
+                        ad.IsPublished = true;
+                        ad.IsPublishedOnSite = true;
+                        TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' опубликовано.");
+                        await AdManager.Instance.UpdateAdAsync(ad);
+                        // Перезапускаем таймер для следующего цикла (снятие)
+                        AdScheduler.Instance.StartForAd(ad);
+                    }
+                    else
+                    {
+                        TerminalLogger.Instance.Log($"[Scheduler] Не удалось опубликовать '{ad.Title}' на сайте");
+                        // При ошибке публикации все равно перезапускаем таймер для повторной попытки
+                        AdScheduler.Instance.StartForAd(ad);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    TerminalLogger.Instance.Log($"[Scheduler] Ошибка при публикации '{ad.Title}': {ex.Message}");
+                    // При исключении перезапускаем таймер для повторной попытки
+                    AdScheduler.Instance.StartForAd(ad);
                 }
             };
 
@@ -104,43 +151,132 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 RefreshCommands();
             });
 
-            ApplyUnpublishTimerCommand = new RelayCommand(() =>
-            {
-                var selected = GetSelectedAds();
-                foreach (var ad in selected)
-                {
-                    ad.AutoRaiseMinutes = UnpublishMinutesInput > 0 ? UnpublishMinutesInput : ad.AutoRaiseMinutes;
-                    ad.IsAutoRaiseEnabled = true;
-                    _ = AdManager.Instance.UpdateAdAsync(ad);
-                }
-                TerminalLogger.Instance.Log($"[Timers] Применён таймер снятия: {UnpublishMinutesInput} мин.");
-            }, () => HasSelection);
+            _siteService = DoskaYktService.Instance;
 
-            RemoveUnpublishTimerCommand = new RelayCommand(() =>
-            {
-                var selected = GetSelectedAds();
-                foreach (var ad in selected)
-                {
-                    ad.IsAutoRaiseEnabled = false;
-                    _ = AdManager.Instance.UpdateAdAsync(ad);
-                }
-                TerminalLogger.Instance.Log("[Timers] Убран таймер снятия.");
-            }, () => HasSelection);
+            // Инициализация команд
+            ApplyUnpublishTimerCommand = new RelayCommand(ApplyUnpublishTimer, () => HasSelection);
+            ApplyPublishTimerCommand = new RelayCommand(ApplyPublishTimer, () => HasSelection);
+            RemoveTimersCommand = new RelayCommand(RemoveTimers, () => HasSelection);
+            RestartTimersCommand = new RelayCommand(RestartTimers);
+            SyncWithSiteCommand = new AsyncRelayCommand(SyncWithSiteAsync);
+            StartAllCommand = new AsyncRelayCommand(StartAllAsync);
 
-            ApplyPublishTimerCommand = new RelayCommand(() =>
-            {
-                TerminalLogger.Instance.Log($"[Timers] Задан отложенный интервал публикации: {PublishMinutesInput} мин (будет учтён планировщиком).");
-            }, () => HasSelection);
-
-            RemovePublishTimerCommand = new RelayCommand(() =>
-            {
-                PublishMinutesInput = 0;
-                TerminalLogger.Instance.Log("[Timers] Убран отложенный интервал публикации.");
-            }, () => HasSelection);
-
-            UnpublishMinutesInput = 30;
-            PublishMinutesInput = 10;
+            UnpublishMinutesInput = 30; // дефолт
+            PublishMinutesInput = 10;   // дефолт
         }
+
+        private void ApplyUnpublishTimer()
+        {
+            if (UnpublishMinutesInput <= 0)
+            {
+                TerminalLogger.Instance.Log("[Timers] Неверный интервал снятия. Таймер не будет установлен.");
+                return;
+            }
+
+            var selected = GetSelectedAds();
+            foreach (var ad in selected)
+            {
+                ad.UnpublishMinutes = UnpublishMinutesInput;
+                ad.RepublishMinutes = PublishMinutesInput;
+                ad.IsAutoRaiseEnabled = true;
+
+                // Настраиваем даты таймеров в зависимости от текущего состояния
+                if (ad.IsPublished)
+                {
+                    // Если опубликовано - ставим таймер на снятие
+                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput);
+                    ad.NextRepublishAt = null;
+                    TerminalLogger.Instance.Log($"[Timers] Для '{ad.Title}' установлен таймер снятия через {UnpublishMinutesInput} мин.");
+                }
+                else
+                {
+                    // Если не опубликовано - ставим таймер на публикацию
+                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput);
+                    ad.NextUnpublishAt = null;
+                    TerminalLogger.Instance.Log($"[Timers] Для '{ad.Title}' установлен таймер публикации через {PublishMinutesInput} мин.");
+                }
+
+                AdScheduler.Instance.StartForAd(ad);
+                _ = AdManager.Instance.UpdateAdAsync(ad);
+            }
+
+            TerminalLogger.Instance.Log($"[Timers] Применены таймеры для {selected.Count} объявлений.");
+        }
+
+        private void ApplyPublishTimer()
+        {
+            if (PublishMinutesInput <= 0)
+            {
+                TerminalLogger.Instance.Log("[Timers] Неверный интервал публикации. Таймер не будет установлен.");
+                return;
+            }
+
+            var selected = GetSelectedAds();
+            foreach (var ad in selected)
+            {
+                ad.RepublishMinutes = PublishMinutesInput;
+                ad.UnpublishMinutes = UnpublishMinutesInput;
+                ad.IsAutoRaiseEnabled = true;
+
+                // Настраиваем даты таймеров
+                if (ad.IsPublished)
+                {
+                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput);
+                    ad.NextRepublishAt = null;
+                }
+                else
+                {
+                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput);
+                    ad.NextUnpublishAt = null;
+                }
+
+                AdScheduler.Instance.StartForAd(ad);
+                _ = AdManager.Instance.UpdateAdAsync(ad);
+            }
+
+            TerminalLogger.Instance.Log($"[Timers] Применён таймер публикации: {PublishMinutesInput} мин.");
+        }
+
+        private void RemoveTimers()
+        {
+            var selected = GetSelectedAds();
+            foreach (var ad in selected)
+            {
+                ad.IsAutoRaiseEnabled = false;
+                ad.NextUnpublishAt = null;
+                ad.NextRepublishAt = null;
+                AdScheduler.Instance.StopForAd(ad.Id);
+                _ = AdManager.Instance.UpdateAdAsync(ad);
+            }
+
+            TerminalLogger.Instance.Log("[Timers] Все таймеры остановлены.");
+        }
+
+        private void RestartTimers()
+        {
+            AdScheduler.Instance.RestartAllTimers();
+        }
+
+        private async Task SyncWithSiteAsync()
+        {
+            TerminalLogger.Instance.Log("[Sync] Начинаем синхронизацию с сайтом...");
+            await AdManager.Instance.SyncWithSiteAsync();
+            TerminalLogger.Instance.Log("[Sync] Синхронизация завершена");
+        }
+
+        private async Task StartAllAsync()
+        {
+            TerminalLogger.Instance.Log("[StartAll] Запуск всех активных таймеров...");
+            
+            // Сначала синхронизируемся с сайтом
+            await SyncWithSiteAsync();
+            
+            // Затем запускаем все таймеры
+            AdScheduler.Instance.RestartAllTimers();
+            
+            TerminalLogger.Instance.Log("[StartAll] Все таймеры запущены");
+        }
+
 
         private async void OnAdRepostRequested(Ad ad)
         {
@@ -148,24 +284,9 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             var acc = AccountManager.Instance.SelectedAccount;
             if (acc == null) return;
 
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(ad.SiteId))
-                {
-                    var unpub = await _siteService.UnpublishAdAsync(acc.Login, acc.Password, ad.SiteId, true, ad.Title);
-                    if (unpub)
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(new Random().Next(3, 8)));
-                        var repub = await _siteService.RepublishAdAsync(acc.Login, acc.Password, ad.SiteId, true);
-                        if (repub)
-                            TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' перепубликовано таймером.");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                TerminalLogger.Instance.Log($"[Scheduler] Ошибка перепубликации '{ad.Title}': {ex.Message}");
-            }
+            var ok = await _siteService.RepostAdWithDelay(acc.Login, acc.Password, ad.SiteId, ad.Title);
+            if (ok)
+                TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' перепубликовано таймером.");
         }
 
         // ================= Вспомогательные методы =================
@@ -187,9 +308,8 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             DeleteOnSiteCommand.RaiseCanExecuteChanged();
             ActivateAdOnSiteCommand.RaiseCanExecuteChanged();
             ApplyUnpublishTimerCommand.RaiseCanExecuteChanged();
-            RemoveUnpublishTimerCommand.RaiseCanExecuteChanged();
+            RemoveTimersCommand.RaiseCanExecuteChanged();
             ApplyPublishTimerCommand.RaiseCanExecuteChanged();
-            RemovePublishTimerCommand.RaiseCanExecuteChanged();
         }
 
         // ================= Реализация команд =================
@@ -276,7 +396,12 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                     var unpublished = await _siteService.UnpublishAdAsync(acc.Login, acc.Password, ad.SiteId, true, ad.Title);
 
                     if (unpublished)
+                    {
+                        ad.IsPublished = false;
+                        ad.IsPublishedOnSite = false;
+                        await AdManager.Instance.UpdateAdAsync(ad);
                         TerminalLogger.Instance.Log($"[SiteDelete] Снято с публикации: '{ad.Title}'.");
+                    }
                     else
                         TerminalLogger.Instance.Log($"[SiteDelete] Не удалось снять с публикации: '{ad.Title}'.");
                 }
@@ -312,7 +437,12 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                     TerminalLogger.Instance.Log($"[SiteActivate] Активация '{ad.Title}'...");
                     var ok = await _siteService.RepublishAdAsync(acc.Login, acc.Password, ad.SiteId, true);
                     if (ok)
+                    {
+                        ad.IsPublished = true;
+                        ad.IsPublishedOnSite = true;
+                        await AdManager.Instance.UpdateAdAsync(ad);
                         TerminalLogger.Instance.Log($"[SiteActivate] '{ad.Title}' опубликовано снова.");
+                    }
                     else
                         TerminalLogger.Instance.Log($"[SiteActivate] Не удалось опубликовать '{ad.Title}'.");
                 }

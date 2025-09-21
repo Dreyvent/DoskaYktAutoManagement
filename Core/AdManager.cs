@@ -48,22 +48,31 @@ namespace DoskaYkt_AutoManagement.Core
         {
             Ads.Clear();
             var rows = await DatabaseHelper.GetAnnouncementsAsync().ConfigureAwait(false);
-            foreach (var (id, title, content, cycle, isAuto, accountId, accountLogin, siteId) in rows)
+            foreach (var (id, title, cycle, isAuto, accountId, accountLogin, siteId, isPublishedOnSite, nextUnpublishAt, nextRepublishAt) in rows)
             {
                 var ad = new Ad
                 {
                     Id = id,
                     Title = title,
                     AutoRaiseMinutes = cycle,
+                    UnpublishMinutes = cycle, // Используем cycle как UnpublishMinutes для совместимости
+                    RepublishMinutes = Math.Max(1, cycle / 3), // RepublishMinutes = 1/3 от UnpublishMinutes
                     IsAutoRaiseEnabled = isAuto == 1,
                     AccountId = accountId,
                     AccountLogin = accountLogin,
-                    SiteId = siteId
+                    SiteId = siteId,
+                    IsPublished = isPublishedOnSite, // Синхронизируем с состоянием на сайте
+                    IsPublishedOnSite = isPublishedOnSite,
+                    NextUnpublishAt = string.IsNullOrEmpty(nextUnpublishAt) ? null : DateTime.TryParse(nextUnpublishAt, out var unpublishDate) ? unpublishDate : null,
+                    NextRepublishAt = string.IsNullOrEmpty(nextRepublishAt) ? null : DateTime.TryParse(nextRepublishAt, out var republishDate) ? republishDate : null
                 };
                 Ads.Add(ad);
-                if (ad.IsAutoRaiseEnabled)
-                    _scheduler.StartForAd(ad);
+                
+                // НЕ запускаем таймеры автоматически при загрузке из БД
+                // Пользователь должен нажать "Запустить всё" для активации
+                TerminalLogger.Instance.Log($"[AdManager] Загружено объявление '{ad.Title}' (Published={ad.IsPublished}, AutoEnabled={ad.IsAutoRaiseEnabled})");
             }
+            TerminalLogger.Instance.Log($"[AdManager] Загружено {Ads.Count} объявлений из БД");
         }
 
         /// <summary>
@@ -77,15 +86,16 @@ namespace DoskaYkt_AutoManagement.Core
                 ad.IsAutoRaiseEnabled,
                 ad.AccountId,
                 ad.AccountLogin,
-                ad.SiteId ?? ""
+                ad.SiteId ?? "",
+                ad.IsPublishedOnSite,
+                ad.NextUnpublishAt?.ToString("yyyy-MM-dd HH:mm:ss"),
+                ad.NextRepublishAt?.ToString("yyyy-MM-dd HH:mm:ss")
             ).ConfigureAwait(false);
 
             Ads.Add(ad);
             if (ad.IsAutoRaiseEnabled)
             {
                 AdScheduler.Instance.StartForAd(ad);
-                ad.NextUnpublishAt = DateTime.Now.AddMinutes(Math.Max(1, ad.AutoRaiseMinutes));
-                ad.NextRepublishAt = ad.NextUnpublishAt?.AddMinutes(DoskaYkt_AutoManagement.Properties.Settings.Default.RepublishDelayMinutes);
             }
         }
 
@@ -109,12 +119,14 @@ namespace DoskaYkt_AutoManagement.Core
                 await DatabaseHelper.UpdateAnnouncementAsync(
                     ad.Id,
                     ad.Title,
-                    "", // content empty
                     ad.AutoRaiseMinutes,
                     ad.IsAutoRaiseEnabled,
                     ad.AccountId,
                     ad.AccountLogin,
-                    ad.SiteId ?? ""
+                    ad.SiteId ?? "",
+                    ad.IsPublishedOnSite,
+                    ad.NextUnpublishAt?.ToString("yyyy-MM-dd HH:mm:ss"),
+                    ad.NextRepublishAt?.ToString("yyyy-MM-dd HH:mm:ss")
                 ).ConfigureAwait(false);
 
             AdScheduler.Instance.RemoveForAd(ad);
@@ -140,6 +152,58 @@ namespace DoskaYkt_AutoManagement.Core
                 await AddAdAsync(newAd);
             }
         }
+        /// <summary>
+        /// Синхронизирует статус объявлений с сайтом
+        /// </summary>
+        public async Task SyncWithSiteAsync()
+        {
+            var acc = AccountManager.Instance.SelectedAccount;
+            if (acc == null)
+            {
+                TerminalLogger.Instance.Log("[Sync] Нет выбранного аккаунта для синхронизации");
+                return;
+            }
+
+            TerminalLogger.Instance.Log("[Sync] Начинаем синхронизацию с сайтом...");
+            
+            try
+            {
+                var (success, message, siteAds) = DoskaYktService.Instance.CheckAds(acc.Login, acc.Password, false);
+                
+                if (!success)
+                {
+                    TerminalLogger.Instance.Log($"[Sync] Ошибка синхронизации: {message}");
+                    return;
+                }
+
+                // Обновляем статус объявлений на основе данных с сайта
+                foreach (var ad in Ads)
+                {
+                    if (string.IsNullOrEmpty(ad.SiteId)) continue;
+                    
+                    var siteAd = siteAds?.FirstOrDefault(sa => sa.Id == ad.SiteId || sa.SiteId == ad.SiteId);
+                    if (siteAd != null)
+                    {
+                        bool wasPublished = ad.IsPublished;
+                        ad.IsPublished = siteAd.IsPublished;
+                        ad.IsPublishedOnSite = siteAd.IsPublished;
+                        
+                        if (wasPublished != ad.IsPublished)
+                        {
+                            TerminalLogger.Instance.Log($"[Sync] Статус '{ad.Title}' изменен: {wasPublished} -> {ad.IsPublished}");
+                            await UpdateAdAsync(ad);
+                        }
+                    }
+                }
+                
+                TerminalLogger.Instance.Log("[Sync] Синхронизация завершена");
+            }
+            catch (Exception ex)
+            {
+                TerminalLogger.Instance.Log($"[Sync] Ошибка при синхронизации: {ex.Message}");
+            }
+        }
+
         // Для работы с сайтом используйте DoskaYktService через ViewModel
     }
 }

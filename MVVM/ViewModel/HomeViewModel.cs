@@ -49,6 +49,23 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             }
         }
 
+        // Переключатель скрытия CMD окна драйвера
+        private bool _hideDriverWindow = Properties.Settings.Default.HideDriverWindow;
+        public bool HideDriverWindow
+        {
+            get => _hideDriverWindow;
+            set
+            {
+                if (_hideDriverWindow != value)
+                {
+                    _hideDriverWindow = value;
+                    Properties.Settings.Default.HideDriverWindow = value;
+                    Properties.Settings.Default.Save();
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         // Команды
         public AsyncRelayCommand CheckAdsCommand { get; }
         public AsyncRelayCommand SaveSelectedCommand { get; }
@@ -175,17 +192,24 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                     Title = found.Title,
                     AccountId = acc.Id,
                     AccountLogin = acc.Login,
-                    SiteId = found.Id,         // если у тебя поле такое есть
-                    IsPublished = found.IsPublished
+                    SiteId = found.Id ?? found.SiteId ?? "",
+                    IsPublished = found.IsPublished,
+                    IsPublishedOnSite = found.IsPublished,
+                    IsAutoRaiseEnabled = false, // По умолчанию таймеры отключены
+                    UnpublishMinutes = 30,      // Дефолтные значения
+                    RepublishMinutes = 10
                 };
 
                 await AdManager.Instance.AddAdAsync(newAd);
-                Core.TerminalLogger.Instance.Log($"[SaveSelected] Сохранено в БД: '{newAd.Title}' (Id={newAd.Id})");
+                Core.TerminalLogger.Instance.Log($"[SaveSelected] Сохранено в БД: '{newAd.Title}' (Id={newAd.Id}, SiteId={newAd.SiteId}, Published={newAd.IsPublished})");
                 saved++;
             }
 
             StatusMessage = saved > 0 ? $"Сохранено {saved} объявлений в БД." : "Не удалось сохранить объявления.";
             OnPropertyChanged(nameof(AdsCount));
+            
+            // Переходим к управлению объявлениями
+            NavigateToMyAds?.Invoke();
         }
 
 

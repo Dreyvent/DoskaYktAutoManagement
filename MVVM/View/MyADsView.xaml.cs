@@ -13,6 +13,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Text.RegularExpressions;
 
 namespace DoskaYkt_AutoManagement.MVVM.View
 {
@@ -25,6 +26,25 @@ namespace DoskaYkt_AutoManagement.MVVM.View
         {
             InitializeComponent();
             DataContext = new MyADsViewModel();
+        }
+        private void NumberOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            // Разрешаем только цифры
+            e.Handled = !Regex.IsMatch(e.Text, @"^\d+$");
+        }
+
+        private void NumberOnly_Pasting(object sender, DataObjectPastingEventArgs e)
+        {
+            if (e.DataObject.GetDataPresent(typeof(string)))
+            {
+                string text = (string)e.DataObject.GetData(typeof(string));
+                if (!Regex.IsMatch(text, @"^\d+$"))
+                    e.CancelCommand();
+            }
+            else
+            {
+                e.CancelCommand();
+            }
         }
     }
 }

@@ -55,7 +55,15 @@ namespace DoskaYkt_AutoManagement.Core
 
         public void CloseSession()
         {
-            try { _driver?.Quit(); } catch { }
+            try 
+            { 
+                _driver?.Quit(); 
+                TerminalLogger.Instance.Log("[Session] Сессия браузера закрыта.");
+            } 
+            catch (Exception ex) 
+            { 
+                TerminalLogger.Instance.Log($"[Session] Ошибка при закрытии браузера: {ex.Message}");
+            }
             try { _driver?.Dispose(); } catch { }
             _driver = null;
             _wait = null;
@@ -68,6 +76,7 @@ namespace DoskaYkt_AutoManagement.Core
         {
             try
             {
+                // Убиваем только процессы драйверов, не браузеры
                 var names = new List<string>();
                 if (string.Equals(_lastDriverKind, "chrome", StringComparison.OrdinalIgnoreCase)) names.Add("chromedriver");
                 if (string.Equals(_lastDriverKind, "firefox", StringComparison.OrdinalIgnoreCase)) names.Add("geckodriver");
@@ -89,10 +98,34 @@ namespace DoskaYkt_AutoManagement.Core
             var options = BuildChromeOptions(showChrome);
             options.AddExcludedArgument("enable-automation");
             options.AddAdditionalOption("useAutomationExtension", false);
-            _driver = new ChromeDriver(options);
-            _lastDriverKind = "chrome";
-            _wait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(500));
+            
+            // Дополнительные опции для стабильности
+            if (Properties.Settings.Default.HideDriverWindow)
+            {
+                options.AddArgument("--disable-gpu");
+                options.AddArgument("--no-sandbox");
+                options.AddArgument("--disable-dev-shm-usage");
+            }
+
+            try
+            {
+                // Создаём сервис драйвера с правильным скрытием CMD окна
+                var service = ChromeDriverService.CreateDefaultService();
+                service.HideCommandPromptWindow = Properties.Settings.Default.HideDriverWindow;
+                
+                _driver = new ChromeDriver(service, options);
+                _lastDriverKind = "chrome";
+                _wait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(500));
+                
+                TerminalLogger.Instance.Log($"[Session] ChromeDriver создан (HideCMD={Properties.Settings.Default.HideDriverWindow})");
+            }
+            catch (Exception ex)
+            {
+                TerminalLogger.Instance.Log($"[Session] Ошибка создания драйвера: {ex.Message}");
+                throw;
+            }
         }
+
 
         private void EnsureLoggedIn(string login, string password)
         {
@@ -136,7 +169,7 @@ namespace DoskaYkt_AutoManagement.Core
                 var ads = new List<AdData>();
                 try
                 {
-                    using var driver = new ChromeDriver(options);
+                    using var driver = _driver;
                     var wait = new WebDriverWait(new SystemClock(), driver, TimeSpan.FromSeconds(20), TimeSpan.FromMilliseconds(250));
                     driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
                     wait.Until(d => d.FindElements(By.CssSelector("div.d-post_desc")).Any());
@@ -404,9 +437,11 @@ namespace DoskaYkt_AutoManagement.Core
             {
                 options.AddArgument("--headless=new");
                 options.AddArgument("--disable-gpu");
+                options.AddArgument("--window-size=1920,1080");
             }
             options.AddArgument("--no-sandbox");
             options.AddArgument("--disable-dev-shm-usage");
+            options.AddArgument("--enable-unsafe-swiftshader");
             return options;
         }
 
@@ -634,6 +669,16 @@ namespace DoskaYkt_AutoManagement.Core
                     return false;
                 }
             }, cancellationToken);
+        }
+
+        public async Task<bool> RepostAdWithDelay(string login, string password, string siteId, string title)
+        {
+            var unpub = await UnpublishAdAsync(login, password, siteId, true, title);
+            if (!unpub) return false;
+
+            await Task.Delay(TimeSpan.FromSeconds(new Random().Next(3, 8)));
+
+            return await RepublishAdAsync(login, password, siteId, true);
         }
 
         // Получить объявления по ID

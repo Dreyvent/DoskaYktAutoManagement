@@ -51,6 +51,38 @@
                                                         <TextBlock Text="Опубликовать: " Foreground="Gray" FontSize="12"/>
                                                         <TextBlock Text="{Binding NextRepublishAt, StringFormat=HH:mm}" Foreground="Gray" FontSize="12"/>
                                                     </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                        <TextBlock Text="Статус: " Foreground="Gray" FontSize="10"/>
+                                                        <TextBlock Foreground="Green" FontSize="10" Margin="4,0,0,0">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Text" Value="Опубликовано"/>
+                                                                    <Setter Property="Foreground" Value="Green"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsPublished}" Value="False">
+                                                                            <Setter Property="Text" Value="Снято"/>
+                                                                            <Setter Property="Foreground" Value="Red"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <TextBlock Text=" | Таймер: " Foreground="Gray" FontSize="10" Margin="4,0,0,0"/>
+                                                        <TextBlock Foreground="Orange" FontSize="10">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Text" Value="Выключен"/>
+                                                                    <Setter Property="Foreground" Value="Gray"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsAutoRaiseEnabled}" Value="True">
+                                                                            <Setter Property="Text" Value="Активен"/>
+                                                                            <Setter Property="Foreground" Value="Orange"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </StackPanel>
                                                 </StackPanel>
                                                 <TextBlock Grid.Column="2" Text="{Binding SiteId}" Foreground="Gray" Margin="5,0,0,0"/>
                                                 <TextBlock Grid.Column="3" Text="{Binding AutoRaiseMinutes}" Foreground="Gray" Margin="10,0,0,0" Visibility="{Binding IsAutoRaiseEnabled, Converter={StaticResource BooleanToVisibilityConverter}}"/>
@@ -87,20 +119,40 @@
                                     Height="36"
                                     Margin="5"
                                     ToolTip="Опубликовать выбранные объявления с сайта"/>
+                            <Button Content="Синхронизировать"
+                                    Command="{Binding SyncWithSiteCommand}"
+                                    Width="auto"
+                                    Padding="5"
+                                    Height="36"
+                                    Margin="5"
+                                    ToolTip="Синхронизировать статус объявлений с сайтом"/>
+                            <Button Content="Запустить всё"
+                                    Command="{Binding StartAllCommand}"
+                                    Width="auto"
+                                    Padding="5"
+                                    Height="36"
+                                    Margin="5"
+                                    Background="#4CAF50"
+                                    Foreground="White"
+                                    ToolTip="Запустить все активные таймеры"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Grid.Row="2" HorizontalAlignment="Center">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition/>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
-                                    <RowDefinition/>
-                                    <RowDefinition/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
+
+                                <!-- Таймер снятия -->
                                 <TextBlock Text="Цикл снятия с публикации:"
                                            Grid.Column="0"
                                            Grid.Row="0"
@@ -110,66 +162,66 @@
                                 <Button Content="Применить таймер"
                                         Grid.Column="2"
                                         Grid.Row="0"
-                                        Width="auto" 
                                         Padding="5"
                                         Command="{Binding ApplyUnpublishTimerCommand}" 
                                         Margin="5" />
-                                <Button Content="Убрать таймер"
-                                        Grid.Column="1"
-                                        Grid.Row="0"
-                                        Width="auto" 
+                                <Button Content="Убрать таймеры"
+                                        Grid.Column="3"
+                                        Grid.Row="1"
                                         Padding="5"
-                                        Command="{Binding RemoveUnpublishTimerCommand}" 
+                                        Command="{Binding RemoveTimersCommand}" 
+                                        Margin="5" />
+                                <Button Content="Перезапустить таймеры"
+                                        Grid.Column="2"
+                                        Grid.Row="1"
+                                        Padding="5"
+                                        Command="{Binding RestartTimersCommand}" 
                                         Margin="5" />
                                 <TextBox Text="{Binding UnpublishMinutesInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          Grid.Column="3"
                                          Grid.Row="0"
                                          FontSize="18"
+                                         DataObject.Pasting="NumberOnly_Pasting"
+                                         PreviewTextInput="NumberOnly_PreviewTextInput"
                                          VerticalContentAlignment="Center"
-                                         Width="100"
-                                         Height="30"
-                                         VerticalAlignment="Center"/>
-                                <TextBlock Text="Таймер в минутах"
+                                         Height="30"/>
+                                <TextBlock Text="минут"
                                            Grid.Column="4"
                                            Grid.Row="0"
                                            Foreground="White"
                                            FontSize="12"
                                            VerticalAlignment="Center"/>
+
+                                <!-- Таймер публикации -->
                                 <TextBlock Text="Цикл публикации:"
                                            Grid.Column="0"
-                                           Grid.Row="1"
+                                           Grid.Row="2"
                                            FontSize="18"
                                            Foreground="White"
                                            VerticalAlignment="Center"/>
                                 <Button Content="Применить таймер"
                                         Grid.Column="2"
-                                        Grid.Row="1"
-                                        Width="auto" 
+                                        Grid.Row="2"
                                         Padding="5"
                                         Command="{Binding ApplyPublishTimerCommand}" 
                                         Margin="5" />
-                                <Button Content="Убрать таймер"
-                                        Grid.Column="1"
-                                        Grid.Row="1"
-                                        Width="auto" 
-                                        Padding="5"
-                                        Command="{Binding RemovePublishTimerCommand}" 
-                                        Margin="5" />
                                 <TextBox Text="{Binding PublishMinutesInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         DataObject.Pasting="NumberOnly_Pasting"
+                                         PreviewTextInput="NumberOnly_PreviewTextInput"
                                          Grid.Column="3"
-                                         Grid.Row="1"
+                                         Grid.Row="2"
                                          FontSize="18"
                                          VerticalContentAlignment="Center"
-                                         Width="100"
-                                         Height="30"
-                                         VerticalAlignment="Center"/>
-                                <TextBlock Text="Таймер в минутах"
+                                         Height="30"/>
+                                <TextBlock Text="минут"
                                            Grid.Column="4"
-                                           Grid.Row="1"
+                                           Grid.Row="2"
                                            Foreground="White"
                                            FontSize="12"
                                            VerticalAlignment="Center"/>
                             </Grid>
+
+
 
                         </StackPanel>
                     </Grid>

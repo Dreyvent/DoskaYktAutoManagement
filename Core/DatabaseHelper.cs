@@ -1,7 +1,8 @@
-﻿using Microsoft.Data.Sqlite;
+﻿using DoskaYkt_AutoManagement.MVVM.Model;
+using Microsoft.Data.Sqlite;
 using System;
-using System.IO;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -45,14 +46,17 @@ namespace DoskaYkt_AutoManagement.Core
                 CREATE TABLE IF NOT EXISTS Announcements (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     Title TEXT NOT NULL,
-                    Content TEXT NOT NULL,
                     Cycle INTEGER NOT NULL,
                     IsAuto INTEGER NOT NULL,
                     AccountId INTEGER NOT NULL,
                     AccountLogin TEXT NOT NULL,
                     SiteId TEXT NOT NULL DEFAULT '',
+                    IsPublishedOnSite INTEGER NOT NULL DEFAULT 0,
+                    NextUnpublishAt TEXT NULL,
+                    NextRepublishAt TEXT NULL,
                     FOREIGN KEY (AccountId) REFERENCES Accounts(Id)
                 );
+
             ";
             command.ExecuteNonQuery();
 
@@ -79,18 +83,41 @@ namespace DoskaYkt_AutoManagement.Core
             command.CommandText = "PRAGMA table_info(Announcements);";
             using var reader2 = command.ExecuteReader();
             bool hasSiteId = false;
+            bool hasIsPublishedOnSite = false;
+            bool hasNextUnpublishAt = false;
+            bool hasNextRepublishAt = false;
             while (reader2.Read())
             {
-                if (reader2.GetString(1).Equals("SiteId", StringComparison.OrdinalIgnoreCase))
-                {
+                var columnName = reader2.GetString(1);
+                if (columnName.Equals("SiteId", StringComparison.OrdinalIgnoreCase))
                     hasSiteId = true;
-                    break;
-                }
+                else if (columnName.Equals("IsPublishedOnSite", StringComparison.OrdinalIgnoreCase))
+                    hasIsPublishedOnSite = true;
+                else if (columnName.Equals("NextUnpublishAt", StringComparison.OrdinalIgnoreCase))
+                    hasNextUnpublishAt = true;
+                else if (columnName.Equals("NextRepublishAt", StringComparison.OrdinalIgnoreCase))
+                    hasNextRepublishAt = true;
             }
             reader2.Close();
+            
             if (!hasSiteId)
             {
                 command.CommandText = "ALTER TABLE Announcements ADD COLUMN SiteId TEXT NOT NULL DEFAULT '';";
+                try { command.ExecuteNonQuery(); } catch { }
+            }
+            if (!hasIsPublishedOnSite)
+            {
+                command.CommandText = "ALTER TABLE Announcements ADD COLUMN IsPublishedOnSite INTEGER NOT NULL DEFAULT 0;";
+                try { command.ExecuteNonQuery(); } catch { }
+            }
+            if (!hasNextUnpublishAt)
+            {
+                command.CommandText = "ALTER TABLE Announcements ADD COLUMN NextUnpublishAt TEXT NULL;";
+                try { command.ExecuteNonQuery(); } catch { }
+            }
+            if (!hasNextRepublishAt)
+            {
+                command.CommandText = "ALTER TABLE Announcements ADD COLUMN NextRepublishAt TEXT NULL;";
                 try { command.ExecuteNonQuery(); } catch { }
             }
         }
@@ -196,15 +223,15 @@ namespace DoskaYkt_AutoManagement.Core
         // ==================
         // Announcements
         // ==================
-        public static async Task<List<(int id, string title, string content, int cycle, int isAuto, int accountId, string accountLogin, string siteId)>> GetAnnouncementsAsync()
+        public static async Task<List<(int id, string title, int cycle, int isAuto, int accountId, string accountLogin, string siteId, bool isPublishedOnSite, string nextUnpublishAt, string nextRepublishAt)>> GetAnnouncementsAsync()
         {
-            var result = new List<(int, string, string, int, int, int, string, string)>();
+            var result = new List<(int, string, int, int, int, string, string, bool, string, string)>();
 
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync().ConfigureAwait(false);
 
             var command = connection.CreateCommand();
-            command.CommandText = "SELECT Id, Title, Content, Cycle, IsAuto, AccountId, AccountLogin, SiteId FROM Announcements;";
+            command.CommandText = "SELECT Id, Title, Cycle, IsAuto, AccountId, AccountLogin, SiteId, IsPublishedOnSite, NextUnpublishAt, NextRepublishAt FROM Announcements;";
 
             using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
             while (await reader.ReadAsync().ConfigureAwait(false))
@@ -212,41 +239,65 @@ namespace DoskaYkt_AutoManagement.Core
                 result.Add((
                     reader.GetInt32(0),
                     reader.GetString(1),
-                    reader.GetString(2),
+                    reader.GetInt32(2),
                     reader.GetInt32(3),
                     reader.GetInt32(4),
-                    reader.GetInt32(5),
-                    reader.GetString(6),
-                    reader.IsDBNull(7) ? string.Empty : reader.GetString(7)
+                    reader.GetString(5),
+                    reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+                    reader.GetInt32(7) == 1,
+                    reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
+                    reader.IsDBNull(9) ? string.Empty : reader.GetString(9)
                 ));
             }
 
             return result;
         }
 
-        public static async Task<int> AddAnnouncementAsync(string title, int cycle, bool isAuto, int accountId, string accountLogin, string siteId = "")
+        public static async Task<int> AddAnnouncementAsync(
+            string title,
+            int cycle,
+            bool isAuto,
+            int accountId,
+            string accountLogin,
+            string siteId = "",
+            bool isPublishedOnSite = false,
+            string? nextUnpublishAt = null,
+            string? nextRepublishAt = null)
         {
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync().ConfigureAwait(false);
 
             var command = connection.CreateCommand();
             command.CommandText = @"
-                INSERT INTO Announcements (Title, Content, Cycle, IsAuto, AccountId, AccountLogin, SiteId)
-                VALUES ($title, $content, $cycle, $isAuto, $accountId, $accountLogin, $siteId);
+                INSERT INTO Announcements 
+                (Title, Cycle, IsAuto, AccountId, AccountLogin, SiteId, IsPublishedOnSite, NextUnpublishAt, NextRepublishAt)
+                VALUES ($title, $cycle, $isAuto, $accountId, $accountLogin, $siteId, $isPublishedOnSite, $nextUnpublishAt, $nextRepublishAt);
                 SELECT last_insert_rowid();";
             command.Parameters.AddWithValue("$title", title);
-            command.Parameters.AddWithValue("$content", ""); // мы храним пустой контент — или можно убрать колонку
             command.Parameters.AddWithValue("$cycle", cycle);
             command.Parameters.AddWithValue("$isAuto", isAuto ? 1 : 0);
             command.Parameters.AddWithValue("$accountId", accountId);
             command.Parameters.AddWithValue("$accountLogin", accountLogin);
             command.Parameters.AddWithValue("$siteId", siteId);
+            command.Parameters.AddWithValue("$isPublishedOnSite", isPublishedOnSite ? 1 : 0);
+            command.Parameters.AddWithValue("$nextUnpublishAt", (object?)nextUnpublishAt ?? DBNull.Value);
+            command.Parameters.AddWithValue("$nextRepublishAt", (object?)nextRepublishAt ?? DBNull.Value);
 
             var result = await command.ExecuteScalarAsync().ConfigureAwait(false);
             return Convert.ToInt32(result);
         }
 
-        public static async Task UpdateAnnouncementAsync(int id, string title, string content, int cycle, bool isAuto, int accountId, string accountLogin, string siteId = "")
+        public static async Task UpdateAnnouncementAsync(
+            int id,
+            string title,
+            int cycle,
+            bool isAuto,
+            int accountId,
+            string accountLogin,
+            string siteId = "",
+            bool isPublishedOnSite = false,
+            string? nextUnpublishAt = null,
+            string? nextRepublishAt = null)
         {
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync().ConfigureAwait(false);
@@ -255,20 +306,24 @@ namespace DoskaYkt_AutoManagement.Core
             command.CommandText = @"
                 UPDATE Announcements
                 SET Title = $title,
-                    Content = $content,
                     Cycle = $cycle,
                     IsAuto = $isAuto,
                     AccountId = $accountId,
                     AccountLogin = $accountLogin,
-                    SiteId = $siteId
+                    SiteId = $siteId,
+                    IsPublishedOnSite = $isPublishedOnSite,
+                    NextUnpublishAt = $nextUnpublishAt,
+                    NextRepublishAt = $nextRepublishAt
                 WHERE Id = $id;";
             command.Parameters.AddWithValue("$title", title);
-            command.Parameters.AddWithValue("$content", content);
             command.Parameters.AddWithValue("$cycle", cycle);
             command.Parameters.AddWithValue("$isAuto", isAuto ? 1 : 0);
             command.Parameters.AddWithValue("$accountId", accountId);
             command.Parameters.AddWithValue("$accountLogin", accountLogin);
             command.Parameters.AddWithValue("$siteId", siteId);
+            command.Parameters.AddWithValue("$isPublishedOnSite", isPublishedOnSite ? 1 : 0);
+            command.Parameters.AddWithValue("$nextUnpublishAt", (object?)nextUnpublishAt ?? DBNull.Value);
+            command.Parameters.AddWithValue("$nextRepublishAt", (object?)nextRepublishAt ?? DBNull.Value);
             command.Parameters.AddWithValue("$id", id);
 
             await command.ExecuteNonQueryAsync().ConfigureAwait(false);
