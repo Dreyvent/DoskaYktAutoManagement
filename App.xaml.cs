@@ -29,18 +29,7 @@ namespace DoskaYkt_AutoManagement
                 Current.Shutdown(); // гарантированно убивает процесс
             };
 
-            // Подписываем вывод логов в UI (MainWindow.AppendLog)
-            Core.TerminalLogger.Instance.LogAdded += line =>
-            {
-                try
-                {
-                    if (MainWindow != null && MainWindow.Dispatcher != null)
-                    {
-                        MainWindow.Dispatcher.Invoke(() => ((MainWindow)MainWindow).AppendLog(line));
-                    }
-                }
-                catch { }
-            };
+            // Логи пробрасываются непосредственно в MainWindow (см. MainWindow.xaml.cs)
 
             _notifyIcon = new Forms.NotifyIcon
             {

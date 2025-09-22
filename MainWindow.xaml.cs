@@ -22,6 +22,9 @@ namespace DoskaYkt_AutoManagement
             InitializeComponent();
             // Устанавливаем DataContext на MainViewModel
             DataContext = new MainViewModel();
+
+            // Подписываемся на события логгера и пересылаем в текстбокс
+            Core.TerminalLogger.Instance.LogAdded += AppendLog;
         }
 
         private void Log(string message)

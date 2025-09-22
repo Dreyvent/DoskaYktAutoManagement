@@ -44,7 +44,7 @@
                                             </Grid.ColumnDefinitions>
                                             <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
                                                 <StackPanel Grid.Column="1" Orientation="Vertical" Margin="5,0,0,0">
-                                                    <TextBlock Text="{Binding Title}" ToolTip="{Binding Description}"/>
+                                                    <TextBlock Text="{Binding Title}"/>
                                                     <StackPanel Orientation="Horizontal" Visibility="{Binding IsAutoRaiseEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
                                                         <TextBlock Text="Снять: " Foreground="Gray" FontSize="12"/>
                                                         <TextBlock Text="{Binding NextUnpublishAt, StringFormat=HH:mm}" Foreground="Gray" FontSize="12" Margin="4,0,10,0"/>
@@ -219,6 +219,55 @@
                                            Foreground="White"
                                            FontSize="12"
                                            VerticalAlignment="Center"/>
+                                <Grid Grid.Row="3"
+                                      Grid.ColumnSpan="5"
+                                      HorizontalAlignment="Center">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="(Перед работой таймеров, проверьте работает ли сессия браузера с драйвером.)"
+                                               Foreground="Gray"
+                                               Grid.ColumnSpan="4"
+                                               Grid.Row="0"
+                                               HorizontalAlignment="Center"/>
+                                    <Button Content="Проверить сессию браузера"
+                                            Command="{Binding CheckBrowserSessionCommand}"
+                                            Width="auto"
+                                            Padding="5"
+                                            Height="36"
+                                            Margin="5"
+                                            Grid.Row="2"
+                                            Grid.ColumnSpan="2"
+                                            HorizontalAlignment="Center"
+                                            ToolTip="Проверить работает ли текущая сессия браузера с драйвером"/>
+                                    <TextBlock Text="{Binding SessionStatusMessage}"
+                                               FontSize="14"
+                                               Margin="5"
+                                               Foreground="White"
+                                               Grid.Row="3"
+                                               Grid.ColumnSpan="2"
+                                               HorizontalAlignment="Center"
+                                               TextWrapping="Wrap"/>
+                                    <Button Content="Запуск сеанса"
+                                            Command="{Binding StartBrowserSessionCommand}"
+                                            Width="auto"
+                                            Padding="5"
+                                            Height="36"
+                                            Margin="5"
+                                            Grid.Row="1"
+                                            Grid.ColumnSpan="2"
+                                            HorizontalAlignment="Center"
+                                            ToolTip="Запустить новый сеанс браузера с драйвером"/>
+
+                                </Grid>
                             </Grid>
 
 

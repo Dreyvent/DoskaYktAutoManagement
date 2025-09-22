@@ -40,6 +40,15 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         public RelayCommand RestartTimersCommand { get; }
         public AsyncRelayCommand SyncWithSiteCommand { get; }
         public AsyncRelayCommand StartAllCommand { get; }
+        public AsyncRelayCommand CheckBrowserSessionCommand { get; }
+        public AsyncRelayCommand StartBrowserSessionCommand { get; }
+
+        private string _sessionStatusMessage;
+        public string SessionStatusMessage
+        {
+            get => _sessionStatusMessage;
+            set => SetProperty(ref _sessionStatusMessage, value);
+        }
 
         private int _unpublishMinutesInput;
         public int UnpublishMinutesInput
@@ -83,32 +92,40 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                         return;
                     }
 
-                    TerminalLogger.Instance.Log($"[Scheduler] Снятие '{ad.Title}'...");
-                    var ok = await _siteService.UnpublishAdAsync(acc.Login, acc.Password, ad.SiteId, true, ad.Title);
+                    await TaskQueue.Instance.Enqueue(async () =>
+                    {
+                        TerminalLogger.Instance.Log($"[Scheduler] Снятие '{ad.Title}'...");
 
-                    if (ok)
-                    {
-                        ad.IsPublished = false;
-                        ad.IsPublishedOnSite = false;
-                        TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' снято.");
-                        await AdManager.Instance.UpdateAdAsync(ad);
-                        
-                        // Небольшая задержка перед перезапуском таймера
+                        // Проверяем состояние перед действием, чтобы избежать лишних операций
+                        var existsOnSite = await _siteService.ExistsAdOnSiteAsync(
+                            acc.Login, acc.Password, ad.SiteId, Properties.Settings.Default.BrowserVisible, ad.Title);
+                        if (!existsOnSite)
+                        {
+                            TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже снято на сайте, пропуск операции");
+                            ad.IsPublished = false;
+                            ad.IsPublishedOnSite = false;
+                            await AdManager.Instance.UpdateAdAsync(ad);
+                        }
+                        else
+                        {
+                            var ok = await _siteService.UnpublishAdAsync(
+                                acc.Login, acc.Password, ad.SiteId, Properties.Settings.Default.BrowserVisible, ad.Title);
+                            if (ok)
+                            {
+                                ad.IsPublished = false;
+                                ad.IsPublishedOnSite = false;
+                                TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' снято.");
+                                await AdManager.Instance.UpdateAdAsync(ad);
+                            }
+                            else
+                            {
+                                TerminalLogger.Instance.Log($"[Scheduler] Не удалось снять '{ad.Title}' с сайта");
+                            }
+                        }
+
                         await Task.Delay(2000);
-                        
-                        // Перезапускаем таймер для следующего цикла (публикация)
                         AdScheduler.Instance.StartForAd(ad);
-                    }
-                    else
-                    {
-                        TerminalLogger.Instance.Log($"[Scheduler] Не удалось снять '{ad.Title}' с сайта");
-                        
-                        // При ошибке снятия ждем дольше перед повторной попыткой
-                        await Task.Delay(10000);
-                        
-                        // Перезапускаем таймер для повторной попытки
-                        AdScheduler.Instance.StartForAd(ad);
-                    }
+                    }, $"Unpublish: {ad.Title} ({ad.SiteId})");
                 }
                 catch (Exception ex)
                 {
@@ -129,31 +146,40 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                         return;
                     }
 
-                    TerminalLogger.Instance.Log($"[Scheduler] Публикация '{ad.Title}'...");
-                    var ok = await _siteService.RepublishAdAsync(acc.Login, acc.Password, ad.SiteId, true);
-                    if (ok)
+                    await TaskQueue.Instance.Enqueue(async () =>
                     {
-                        ad.IsPublished = true;
-                        ad.IsPublishedOnSite = true;
-                        TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' опубликовано.");
-                        await AdManager.Instance.UpdateAdAsync(ad);
-                        
-                        // Небольшая задержка перед перезапуском таймера
+                        TerminalLogger.Instance.Log($"[Scheduler] Публикация '{ad.Title}'...");
+
+                        // Проверим состояние, чтобы не публиковать повторно
+                        var existsOnSite = await _siteService.ExistsAdOnSiteAsync(
+                            acc.Login, acc.Password, ad.SiteId, Properties.Settings.Default.BrowserVisible, ad.Title);
+                        if (existsOnSite)
+                        {
+                            TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже опубликовано на сайте, пропуск операции");
+                            ad.IsPublished = true;
+                            ad.IsPublishedOnSite = true;
+                            await AdManager.Instance.UpdateAdAsync(ad);
+                        }
+                        else
+                        {
+                            var ok = await _siteService.RepublishAdAsync(
+                                acc.Login, acc.Password, ad.SiteId, Properties.Settings.Default.BrowserVisible);
+                            if (ok)
+                            {
+                                ad.IsPublished = true;
+                                ad.IsPublishedOnSite = true;
+                                TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' опубликовано.");
+                                await AdManager.Instance.UpdateAdAsync(ad);
+                            }
+                            else
+                            {
+                                TerminalLogger.Instance.Log($"[Scheduler] Не удалось опубликовать '{ad.Title}' на сайте");
+                            }
+                        }
+
                         await Task.Delay(2000);
-                        
-                        // Перезапускаем таймер для следующего цикла (снятие)
                         AdScheduler.Instance.StartForAd(ad);
-                    }
-                    else
-                    {
-                        TerminalLogger.Instance.Log($"[Scheduler] Не удалось опубликовать '{ad.Title}' на сайте");
-                        
-                        // При ошибке публикации ждем дольше перед повторной попыткой
-                        await Task.Delay(10000);
-                        
-                        // Перезапускаем таймер для повторной попытки
-                        AdScheduler.Instance.StartForAd(ad);
-                    }
+                    }, $"Publish: {ad.Title} ({ad.SiteId})");
                 }
                 catch (Exception ex)
                 {
@@ -184,6 +210,9 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             SyncWithSiteCommand = new AsyncRelayCommand(SyncWithSiteAsync);
             StartAllCommand = new AsyncRelayCommand(StartAllAsync);
 
+            CheckBrowserSessionCommand = new AsyncRelayCommand(CheckBrowserSessionAsync);
+            StartBrowserSessionCommand = new AsyncRelayCommand(StartBrowserSessionAsync);
+
             UnpublishMinutesInput = 30; // дефолт
             PublishMinutesInput = 10;   // дефолт
         }
@@ -197,8 +226,15 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             }
 
             var selected = GetSelectedAds();
-            foreach (var ad in selected)
+            if (selected.Count == 0) return;
+
+            // Распределяем старты: шаг в минутах + небольшой случайный джиттер
+            var stepMinutes = Math.Max(1, Math.Min(5, UnpublishMinutesInput / Math.Max(1, selected.Count)));
+            var rnd = new Random();
+
+            for (int i = 0; i < selected.Count; i++)
             {
+                var ad = selected[i];
                 ad.UnpublishMinutes = UnpublishMinutesInput;
                 ad.RepublishMinutes = PublishMinutesInput;
                 ad.IsAutoRaiseEnabled = true;
@@ -207,14 +243,18 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 if (ad.IsPublished)
                 {
                     // Если опубликовано - ставим таймер на снятие
-                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput);
+                    var jitterSec = rnd.Next(5, 30);
+                    var offset = TimeSpan.FromMinutes(i * stepMinutes).Add(TimeSpan.FromSeconds(jitterSec));
+                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput).Add(offset);
                     ad.NextRepublishAt = null;
                     TerminalLogger.Instance.Log($"[Timers] Для '{ad.Title}' установлен таймер снятия через {UnpublishMinutesInput} мин.");
                 }
                 else
                 {
                     // Если не опубликовано - ставим таймер на публикацию
-                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput);
+                    var jitterSec = rnd.Next(5, 30);
+                    var offset = TimeSpan.FromMinutes(i * stepMinutes).Add(TimeSpan.FromSeconds(jitterSec));
+                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput).Add(offset);
                     ad.NextUnpublishAt = null;
                     TerminalLogger.Instance.Log($"[Timers] Для '{ad.Title}' установлен таймер публикации через {PublishMinutesInput} мин.");
                 }
@@ -235,8 +275,14 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             }
 
             var selected = GetSelectedAds();
-            foreach (var ad in selected)
+            if (selected.Count == 0) return;
+
+            var stepMinutes = Math.Max(1, Math.Min(5, PublishMinutesInput / Math.Max(1, selected.Count)));
+            var rnd = new Random();
+
+            for (int i = 0; i < selected.Count; i++)
             {
+                var ad = selected[i];
                 ad.RepublishMinutes = PublishMinutesInput;
                 ad.UnpublishMinutes = UnpublishMinutesInput;
                 ad.IsAutoRaiseEnabled = true;
@@ -244,12 +290,16 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 // Настраиваем даты таймеров
                 if (ad.IsPublished)
                 {
-                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput);
+                    var jitterSec = rnd.Next(5, 30);
+                    var offset = TimeSpan.FromMinutes(i * stepMinutes).Add(TimeSpan.FromSeconds(jitterSec));
+                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput).Add(offset);
                     ad.NextRepublishAt = null;
                 }
                 else
                 {
-                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput);
+                    var jitterSec = rnd.Next(5, 30);
+                    var offset = TimeSpan.FromMinutes(i * stepMinutes).Add(TimeSpan.FromSeconds(jitterSec));
+                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput).Add(offset);
                     ad.NextUnpublishAt = null;
                 }
 
@@ -298,6 +348,47 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             AdScheduler.Instance.RestartAllTimers();
             
             TerminalLogger.Instance.Log("[StartAll] Все таймеры запущены");
+        }
+
+        private Task CheckBrowserSessionAsync()
+        {
+            return Task.Run(() =>
+            {
+                var service = DoskaYktService.Instance;
+                var active = service.IsSessionActive;
+                var logged = service.IsLoggedIn;
+                SessionStatusMessage = active
+                    ? (logged ? "Сессия активна и авторизована." : "Сессия активна, но не авторизована.")
+                    : "Сессия не активна.";
+                TerminalLogger.Instance.Log($"[Session] {SessionStatusMessage}");
+            });
+        }
+
+        private async Task StartBrowserSessionAsync()
+        {
+            try
+            {
+                var acc = AccountManager.Instance.SelectedAccount;
+                if (acc == null)
+                {
+                    SessionStatusMessage = "Нет выбранного аккаунта.";
+                    TerminalLogger.Instance.Log("[Session] Нет выбранного аккаунта.");
+                    return;
+                }
+
+                await TaskQueue.Instance.Enqueue(async () =>
+                {
+                    TerminalLogger.Instance.Log("[Session] Запуск сеанса браузера и вход...");
+                    var ok = await _siteService.LoginAsync(
+                        acc.Login, acc.Password, Properties.Settings.Default.BrowserVisible);
+                    SessionStatusMessage = ok ? "Сеанс запущен и выполнен вход." : "Не удалось запустить сеанс/войти.";
+                }, "Start Browser Session");
+            }
+            catch (Exception ex)
+            {
+                TerminalLogger.Instance.LogError("[Session] Ошибка запуска сеанса", ex);
+                SessionStatusMessage = "Ошибка запуска сеанса.";
+            }
         }
 
         /// <summary>

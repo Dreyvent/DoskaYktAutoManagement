@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Timers;
 using DoskaYkt_AutoManagement.MVVM.Model;
 using Timer = System.Timers.Timer;
+using System.Threading.Tasks;
+using System.Linq;
 
 namespace DoskaYkt_AutoManagement.Core
 {
     public class AdScheduler
     {
         private readonly Dictionary<int, Timer> _timers = new();
+        // Legacy single-op lock replaced by centralized queue. Keeping minimal guard for timer drift.
         private readonly object _operationLock = new object();
         private bool _isOperationInProgress = false;
 
@@ -62,21 +65,15 @@ namespace DoskaYkt_AutoManagement.Core
                 {
                     timer.Stop();
 
-                    // Блокируем одновременные операции
+                    // Минимальная защита от лавины таймеров: небольшая де-буфферизация
                     lock (_operationLock)
                     {
                         if (_isOperationInProgress)
                         {
-                            TerminalLogger.Instance.Log($"[Scheduler] Операция уже выполняется, откладываем '{ad.Title}' на 30 секунд");
-                            // Перезапускаем таймер через 30 секунд
-                            var retryDelay = new Random().Next(10000, 30000); // 10–30 сек
-                            var delayTimer = new Timer(retryDelay);
-                            delayTimer.AutoReset = false;
-                            delayTimer.Elapsed += (ds, de) =>
-                            {
-                                delayTimer.Dispose();
-                                StartForAd(ad);
-                            };
+                            var retryDelay = new Random().Next(5000, 15000);
+                            TerminalLogger.Instance.Log($"[Scheduler] Таймер снятия совпал с другой операцией, отложим '{ad.Title}' на {retryDelay/1000}s");
+                            var delayTimer = new Timer(retryDelay) { AutoReset = false };
+                            delayTimer.Elapsed += (ds, de) => { delayTimer.Dispose(); StartForAd(ad); };
                             delayTimer.Start();
                             return;
                         }
@@ -85,28 +82,18 @@ namespace DoskaYkt_AutoManagement.Core
 
                     try
                     {
-                        // Случайная задержка от 5 до 15 секунд для предотвращения конфликтов
-                        var randomDelay = new Random().Next(5000, 15000);
-                        TerminalLogger.Instance.Log($"[Scheduler] Ожидание {randomDelay/1000} сек перед операцией для '{ad.Title}'");
+                        // Небольшой джиттер перед постановкой в очередь
+                        var randomDelay = new Random().Next(2000, 7000);
+                        TerminalLogger.Instance.Log($"[Scheduler] Джиттер {randomDelay/1000}s перед снятием '{ad.Title}'");
                         await Task.Delay(randomDelay);
 
                         TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Начинаем снятие с публикации...");
 
-                        // Проверяем текущее состояние на сайте перед снятием
+                        // Дальше реальную работу делает ViewModel через очередь
                         var acc = AccountManager.Instance.SelectedAccount;
                         if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
                         {
-                            var existsOnSite = await DoskaYktService.Instance.ExistsAdOnSiteAsync(acc.Login, acc.Password, ad.SiteId, false, ad.Title);
-                            if (!existsOnSite)
-                            {
-                                TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже снято с сайта, пропускаем операцию");
-                                ad.IsPublished = false;
-                                ad.IsPublishedOnSite = false;
-                            }
-                            else
-                            {
-                                AdUnpublishRequested?.Invoke(ad);
-                            }
+                            AdUnpublishRequested?.Invoke(ad);
                         }
                         else
                         {
@@ -168,21 +155,15 @@ namespace DoskaYkt_AutoManagement.Core
                 {
                     timer.Stop();
 
-                    // Блокируем одновременные операции
+                    // Минимальная защита от лавины таймеров: небольшая де-буфферизация
                     lock (_operationLock)
                     {
                         if (_isOperationInProgress)
                         {
-                            TerminalLogger.Instance.Log($"[Scheduler] Операция уже выполняется, откладываем '{ad.Title}' на 30 секунд");
-                            // Перезапускаем таймер
-                            var retryDelay = new Random().Next(10000, 30000); // 10–30 сек
-                            var delayTimer = new Timer(retryDelay);
-                            delayTimer.AutoReset = false;
-                            delayTimer.Elapsed += (ds, de) =>
-                            {
-                                delayTimer.Dispose();
-                                StartForAd(ad);
-                            };
+                            var retryDelay = new Random().Next(2000, 7000);
+                            TerminalLogger.Instance.Log($"[Scheduler] Таймер публикации совпал с другой операцией, отложим '{ad.Title}' на {retryDelay/1000}s");
+                            var delayTimer = new Timer(retryDelay) { AutoReset = false };
+                            delayTimer.Elapsed += (ds, de) => { delayTimer.Dispose(); StartForAd(ad); };
                             delayTimer.Start();
                             return;
                         }
@@ -191,28 +172,18 @@ namespace DoskaYkt_AutoManagement.Core
 
                     try
                     {
-                        // Случайная задержка от 5 до 15 секунд для предотвращения конфликтов
-                        var randomDelay = new Random().Next(5000, 15000);
-                        TerminalLogger.Instance.Log($"[Scheduler] Ожидание {randomDelay/1000} сек перед операцией для '{ad.Title}'");
+                        // Небольшой джиттер перед постановкой в очередь
+                        var randomDelay = new Random().Next(2000, 7000);
+                        TerminalLogger.Instance.Log($"[Scheduler] Джиттер {randomDelay/1000}s перед публикацией '{ad.Title}'");
                         await Task.Delay(randomDelay);
 
                         TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Начинаем публикацию...");
 
-                        // Проверяем текущее состояние на сайте перед публикацией
+                        // Дальше реальную работу делает ViewModel через очередь
                         var acc = AccountManager.Instance.SelectedAccount;
                         if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
                         {
-                            var existsOnSite = await DoskaYktService.Instance.ExistsAdOnSiteAsync(acc.Login, acc.Password, ad.SiteId, false, ad.Title);
-                            if (existsOnSite)
-                            {
-                                TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже опубликовано на сайте, пропускаем операцию");
-                                ad.IsPublished = true;
-                                ad.IsPublishedOnSite = true;
-                            }
-                            else
-                            {
-                                AdPublishRequested?.Invoke(ad);
-                            }
+                            AdPublishRequested?.Invoke(ad);
                         }
                         else
                         {

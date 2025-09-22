@@ -97,7 +97,6 @@
                                   Foreground="Black" 
                                   Width="100" 
                                   HorizontalAlignment="Left" 
-                                  SelectedItem="{Binding SelectedBrowser}" 
                                   ToolTip="Выберите браузер для работы">
                             <ComboBoxItem Content="Chrome"/>
                             <ComboBoxItem Content="Firefox"/>

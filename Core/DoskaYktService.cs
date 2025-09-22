@@ -13,6 +13,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DoskaYkt_AutoManagement.MVVM.Model;
+using System.ComponentModel;
 
 namespace DoskaYkt_AutoManagement.Core
 {
@@ -55,24 +56,29 @@ namespace DoskaYkt_AutoManagement.Core
 
         public void CloseSession()
         {
-            try 
-            { 
-                _driver?.Quit(); 
-                TerminalLogger.Instance.Log("[Session] Сессия браузера закрыта.");
-            } 
-            catch (Exception ex) 
-            { 
-                TerminalLogger.Instance.Log($"[Session] Ошибка при закрытии браузера: {ex.Message}");
-            }
-            finally
+            // Сбрасываем состояние немедленно, закрытие выполняем в фоне, чтобы не блокировать UI
+            var driverToClose = _driver;
+            _driver = null;
+            _wait = null;
+            _isLoggedIn = false;
+            _currentLogin = null;
+
+            Task.Run(() =>
             {
-                try { _driver?.Dispose(); } catch { }
-                _driver = null;
-                _wait = null;
-                _isLoggedIn = false;
-                _currentLogin = null;
-                TryKillLeftoverDrivers();
-            }
+                try
+                {
+                    try { driverToClose?.Quit(); }
+                    catch (Exception ex)
+                    {
+                        TerminalLogger.Instance.Log($"[Session] Ошибка при закрытии браузера: {ex.Message}");
+                    }
+
+                    try { driverToClose?.Dispose(); } catch { }
+                    TryKillLeftoverDrivers();
+                    TerminalLogger.Instance.Log("[Session] Сессия браузера закрыта.");
+                }
+                catch { }
+            });
         }
 
         private void TryKillLeftoverDrivers()
@@ -85,9 +91,23 @@ namespace DoskaYkt_AutoManagement.Core
                 if (string.Equals(_lastDriverKind, "firefox", StringComparison.OrdinalIgnoreCase)) names.Add("geckodriver");
                 foreach (var name in names)
                 {
-                    foreach (var p in Process.GetProcessesByName(name))
+                    Process[] procs;
+                    try { procs = Process.GetProcessesByName(name); }
+                    catch { procs = Array.Empty<Process>(); }
+
+                    foreach (var p in procs)
                     {
-                        try { p.Kill(true); } catch { }
+                        try
+                        {
+                            if (!p.HasExited)
+                            {
+                                // Не ждём завершения процесса, чтобы не зависнуть
+                                p.Kill();
+                            }
+                        }
+                        catch (Win32Exception) { }
+                        catch (InvalidOperationException) { }
+                        catch { }
                     }
                 }
             }
