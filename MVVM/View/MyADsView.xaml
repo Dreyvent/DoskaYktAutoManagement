@@ -32,7 +32,16 @@
                                     <Button Content="Выбрать все" Command="{Binding SelectAllCommand}" Margin="0,0,5,0"/>
                                     <Button Content="Снять все" Command="{Binding ClearSelectionCommand}"/>
                                 </StackPanel>
-                                <ListBox ItemsSource="{Binding MyAds}" SelectedItem="{Binding SelectedAd}" Grid.Row="0" SelectionMode="Extended">
+                                <StackPanel Orientation="Horizontal" Margin="5" HorizontalAlignment="Left">
+                                    <TextBlock Text="Сортировка:" Foreground="White" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <ComboBox Width="140" SelectedValue="{Binding SortBy}" SelectedValuePath="Content" Margin="0,0,5,0">
+                                        <ComboBoxItem Content="Title"/>
+                                        <ComboBoxItem Content="SiteId"/>
+                                        <ComboBoxItem Content="Id"/>
+                                    </ComboBox>
+                                    <ToggleButton Content="По возр." IsChecked="{Binding SortAscending}" Width="90"/>
+                                </StackPanel>
+                                <ListBox ItemsSource="{Binding MyAdsView}" SelectedItem="{Binding SelectedAd}" Grid.Row="0" SelectionMode="Extended">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <Grid>

@@ -15,6 +15,7 @@ namespace DoskaYkt_AutoManagement.Core
 
         private readonly SemaphoreSlim _singleWorkerSemaphore;
         private readonly ConcurrentQueue<(Func<Task> work, string? description)> _queue = new();
+        private readonly ConcurrentDictionary<string, byte> _keysInFlight = new();
         private int _isWorkerRunning = 0;
 
         private TaskQueue()
@@ -26,6 +27,27 @@ namespace DoskaYkt_AutoManagement.Core
         {
             if (work == null) return Task.CompletedTask;
             _queue.Enqueue((work, description));
+            StartWorkerIfNeeded();
+            return Task.CompletedTask;
+        }
+
+        public Task EnqueueOnce(string key, Func<Task> work, string? description = null)
+        {
+            if (string.IsNullOrWhiteSpace(key) || work == null) return Task.CompletedTask;
+            if (!_keysInFlight.TryAdd(key, 0))
+            {
+                // duplicate task is already queued or running; silently ignore
+                return Task.CompletedTask;
+            }
+
+            // Wrap work to ensure key cleanup when done
+            async Task Wrapped()
+            {
+                try { await work().ConfigureAwait(false); }
+                finally { _keysInFlight.TryRemove(key, out _); }
+            }
+
+            _queue.Enqueue((Wrapped, description));
             StartWorkerIfNeeded();
             return Task.CompletedTask;
         }

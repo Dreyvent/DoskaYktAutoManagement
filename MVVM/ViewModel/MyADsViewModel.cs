@@ -4,6 +4,8 @@ using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using System.ComponentModel;
+using System.Windows.Data;
 
 namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 {
@@ -75,6 +77,10 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 
         public MyADsViewModel()
         {
+            MyAdsView = CollectionViewSource.GetDefaultView(MyAds);
+            SortBy = "Title";
+            SortAscending = true;
+            ApplySort();
             AdScheduler.Instance.AdRepostRequested += OnAdRepostRequested;
             DeleteAdCommand = new RelayCommand(DeleteAd, () => HasSelection);
             BumpAdCommand = new RelayCommand(BumpAd, () => HasSelection);
@@ -92,35 +98,22 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                         return;
                     }
 
-                    await TaskQueue.Instance.Enqueue(async () =>
+                    await TaskQueue.Instance.EnqueueOnce($"unpub:{ad.SiteId}", async () =>
                     {
                         TerminalLogger.Instance.Log($"[Scheduler] Снятие '{ad.Title}'...");
 
-                        // Проверяем состояние перед действием, чтобы избежать лишних операций
-                        var existsOnSite = await _siteService.ExistsAdOnSiteAsync(
+                        var ok = await _siteService.UnpublishAdAsync(
                             acc.Login, acc.Password, ad.SiteId, Properties.Settings.Default.BrowserVisible, ad.Title);
-                        if (!existsOnSite)
+                        if (ok)
                         {
-                            TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже снято на сайте, пропуск операции");
                             ad.IsPublished = false;
                             ad.IsPublishedOnSite = false;
+                            TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' снято.");
                             await AdManager.Instance.UpdateAdAsync(ad);
                         }
                         else
                         {
-                            var ok = await _siteService.UnpublishAdAsync(
-                                acc.Login, acc.Password, ad.SiteId, Properties.Settings.Default.BrowserVisible, ad.Title);
-                            if (ok)
-                            {
-                                ad.IsPublished = false;
-                                ad.IsPublishedOnSite = false;
-                                TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' снято.");
-                                await AdManager.Instance.UpdateAdAsync(ad);
-                            }
-                            else
-                            {
-                                TerminalLogger.Instance.Log($"[Scheduler] Не удалось снять '{ad.Title}' с сайта");
-                            }
+                            TerminalLogger.Instance.Log($"[Scheduler] Не удалось снять '{ad.Title}' с сайта");
                         }
 
                         await Task.Delay(2000);
@@ -146,35 +139,22 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                         return;
                     }
 
-                    await TaskQueue.Instance.Enqueue(async () =>
+                    await TaskQueue.Instance.EnqueueOnce($"pub:{ad.SiteId}", async () =>
                     {
                         TerminalLogger.Instance.Log($"[Scheduler] Публикация '{ad.Title}'...");
 
-                        // Проверим состояние, чтобы не публиковать повторно
-                        var existsOnSite = await _siteService.ExistsAdOnSiteAsync(
-                            acc.Login, acc.Password, ad.SiteId, Properties.Settings.Default.BrowserVisible, ad.Title);
-                        if (existsOnSite)
+                        var ok = await _siteService.RepublishAdAsync(
+                            acc.Login, acc.Password, ad.SiteId, Properties.Settings.Default.BrowserVisible);
+                        if (ok)
                         {
-                            TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' уже опубликовано на сайте, пропуск операции");
                             ad.IsPublished = true;
                             ad.IsPublishedOnSite = true;
+                            TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' опубликовано.");
                             await AdManager.Instance.UpdateAdAsync(ad);
                         }
                         else
                         {
-                            var ok = await _siteService.RepublishAdAsync(
-                                acc.Login, acc.Password, ad.SiteId, Properties.Settings.Default.BrowserVisible);
-                            if (ok)
-                            {
-                                ad.IsPublished = true;
-                                ad.IsPublishedOnSite = true;
-                                TerminalLogger.Instance.Log($"[Scheduler] '{ad.Title}' опубликовано.");
-                                await AdManager.Instance.UpdateAdAsync(ad);
-                            }
-                            else
-                            {
-                                TerminalLogger.Instance.Log($"[Scheduler] Не удалось опубликовать '{ad.Title}' на сайте");
-                            }
+                            TerminalLogger.Instance.Log($"[Scheduler] Не удалось опубликовать '{ad.Title}' на сайте");
                         }
 
                         await Task.Delay(2000);
@@ -215,6 +195,36 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 
             UnpublishMinutesInput = 30; // дефолт
             PublishMinutesInput = 10;   // дефолт
+        }
+
+        // ===== Sorting =====
+        public ICollectionView MyAdsView { get; }
+        private string _sortBy;
+        public string SortBy
+        {
+            get => _sortBy; set { _sortBy = value; OnPropertyChanged(nameof(SortBy)); ApplySort(); }
+        }
+        private bool _sortAscending;
+        public bool SortAscending
+        {
+            get => _sortAscending; set { _sortAscending = value; OnPropertyChanged(nameof(SortAscending)); ApplySort(); }
+        }
+
+        public void ApplySort()
+        {
+            using (MyAdsView.DeferRefresh())
+            {
+                MyAdsView.SortDescriptions.Clear();
+                var dir = SortAscending ? ListSortDirection.Ascending : ListSortDirection.Descending;
+                if (string.Equals(SortBy, "Title", StringComparison.OrdinalIgnoreCase))
+                    MyAdsView.SortDescriptions.Add(new SortDescription(nameof(Ad.Title), dir));
+                else if (string.Equals(SortBy, "SiteId", StringComparison.OrdinalIgnoreCase))
+                    MyAdsView.SortDescriptions.Add(new SortDescription(nameof(Ad.SiteId), dir));
+                else if (string.Equals(SortBy, "Id", StringComparison.OrdinalIgnoreCase))
+                    MyAdsView.SortDescriptions.Add(new SortDescription(nameof(Ad.Id), dir));
+                else
+                    MyAdsView.SortDescriptions.Add(new SortDescription(nameof(Ad.Title), dir));
+            }
         }
 
         private void ApplyUnpublishTimer()

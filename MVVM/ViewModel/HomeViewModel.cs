@@ -7,6 +7,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using System.Windows.Data;
 
 namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 {
@@ -24,6 +25,18 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         {
             get => _foundAds;
             set { _foundAds = value; OnPropertyChanged(); }
+        }
+
+        public ICollectionView FoundAdsView { get; }
+        private string _foundSortBy = "Title";
+        public string FoundSortBy
+        {
+            get => _foundSortBy; set { _foundSortBy = value; OnPropertyChanged(); ApplyFoundSort(); }
+        }
+        private bool _foundSortAscending = true;
+        public bool FoundSortAscending
+        {
+            get => _foundSortAscending; set { _foundSortAscending = value; OnPropertyChanged(); ApplyFoundSort(); }
         }
 
         // Для множественного выбора
@@ -79,6 +92,8 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 
         public HomeViewModel()
         {
+            FoundAdsView = CollectionViewSource.GetDefaultView(FoundAds);
+            ApplyFoundSort();
             CheckAdsCommand = new AsyncRelayCommand(CheckAdsAsync);
             SaveSelectedCommand = new AsyncRelayCommand(SaveSelectedAdsAsync);
             SelectAllFoundCommand = new RelayCommand(() =>
@@ -118,6 +133,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         {
             StatusMessage = "Запуск проверки объявлений...";
             FoundAds.Clear();
+            FoundAdsView.Refresh();
 
             var acc = AccountManager.Instance.SelectedAccount;
             if (acc == null)
@@ -169,6 +185,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 {
                     ad.IsSelected = false;
                     FoundAds.Add(ad);
+                    // сортировка обновится автоматически благодаря ICollectionView
                     // НЕ запускаем таймер для найденных объявлений - только сканируем!
                     var status = ad.IsPublished ? "опубликовано" : "неопубликовано";
                     Core.TerminalLogger.Instance.Log($" - {ad.Title} ({status})");
@@ -190,6 +207,21 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             else if (!unpubSuccess)
             {
                 Core.TerminalLogger.Instance.Log("[CheckAds] Ошибка при сканировании неопубликованных объявлений, но опубликованные найдены");
+            }
+        }
+
+        private void ApplyFoundSort()
+        {
+            using (FoundAdsView.DeferRefresh())
+            {
+                FoundAdsView.SortDescriptions.Clear();
+                var dir = FoundSortAscending ? ListSortDirection.Ascending : ListSortDirection.Descending;
+                if (string.Equals(FoundSortBy, "Title", StringComparison.OrdinalIgnoreCase))
+                    FoundAdsView.SortDescriptions.Add(new SortDescription(nameof(AdData.Title), dir));
+                else if (string.Equals(FoundSortBy, "Id", StringComparison.OrdinalIgnoreCase))
+                    FoundAdsView.SortDescriptions.Add(new SortDescription(nameof(AdData.Id), dir));
+                else
+                    FoundAdsView.SortDescriptions.Add(new SortDescription(nameof(AdData.Title), dir));
             }
         }
 
