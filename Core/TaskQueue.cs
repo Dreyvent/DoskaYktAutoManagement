@@ -6,57 +6,69 @@ using System.Threading.Tasks;
 namespace DoskaYkt_AutoManagement.Core
 {
     /// <summary>
-    /// Centralized task queue to serialize Selenium operations and cap concurrency.
+    /// Centralized FIFO task queue. Ensures only one Selenium operation runs at a time.
     /// </summary>
     public sealed class TaskQueue
     {
         private static readonly Lazy<TaskQueue> _instance = new(() => new TaskQueue());
         public static TaskQueue Instance => _instance.Value;
 
-        private readonly SemaphoreSlim _parallelLimiter;
-
-        private int _maxParallel;
-        public int MaxParallel
-        {
-            get => _maxParallel;
-            set
-            {
-                if (value < 1) value = 1;
-                if (value == _maxParallel) return;
-                // Recreate limiter to apply new capacity
-                var newLimiter = new SemaphoreSlim(value, value);
-                // Drain old permits (best-effort)
-                _parallelLimiter.Dispose();
-                _maxParallel = value;
-                // Note: this is a simplistic reset; callers should set before active use
-            }
-        }
+        private readonly SemaphoreSlim _singleWorkerSemaphore;
+        private readonly ConcurrentQueue<(Func<Task> work, string? description)> _queue = new();
+        private int _isWorkerRunning = 0;
 
         private TaskQueue()
         {
-            _maxParallel = 1; // default to single browser/session at a time
-            _parallelLimiter = new SemaphoreSlim(_maxParallel, _maxParallel);
+            _singleWorkerSemaphore = new SemaphoreSlim(1, 1);
         }
 
-        public async Task Enqueue(Func<Task> work, string? description = null)
+        public Task Enqueue(Func<Task> work, string? description = null)
         {
-            if (work == null) return;
-            await _parallelLimiter.WaitAsync().ConfigureAwait(false);
+            if (work == null) return Task.CompletedTask;
+            _queue.Enqueue((work, description));
+            StartWorkerIfNeeded();
+            return Task.CompletedTask;
+        }
+
+        private void StartWorkerIfNeeded()
+        {
+            if (Interlocked.CompareExchange(ref _isWorkerRunning, 1, 0) == 0)
+            {
+                _ = Task.Run(RunWorkerAsync);
+            }
+        }
+
+        private async Task RunWorkerAsync()
+        {
             try
             {
-                if (!string.IsNullOrWhiteSpace(description))
-                    TerminalLogger.Instance.Log($"[Queue] Start: {description}");
-                await work().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                TerminalLogger.Instance.LogError("[Queue] Ошибка выполнения задачи", ex);
+                while (_queue.TryDequeue(out var item))
+                {
+                    try
+                    {
+                        if (!string.IsNullOrWhiteSpace(item.description))
+                            TerminalLogger.Instance.Log($"[Queue] Start: {item.description}");
+                        await item.work().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        TerminalLogger.Instance.LogError("[Queue] Ошибка выполнения задачи", ex);
+                    }
+                    finally
+                    {
+                        if (!string.IsNullOrWhiteSpace(item.description))
+                            TerminalLogger.Instance.Log($"[Queue] Done: {item.description}");
+                    }
+                }
             }
             finally
             {
-                if (!string.IsNullOrWhiteSpace(description))
-                    TerminalLogger.Instance.Log($"[Queue] Done: {description}");
-                _parallelLimiter.Release();
+                // Mark worker as stopped; if items arrived concurrently, restart.
+                Interlocked.Exchange(ref _isWorkerRunning, 0);
+                if (!_queue.IsEmpty)
+                {
+                    StartWorkerIfNeeded();
+                }
             }
         }
     }

@@ -11,9 +11,6 @@ namespace DoskaYkt_AutoManagement.Core
     public class AdScheduler
     {
         private readonly Dictionary<int, Timer> _timers = new();
-        // Legacy single-op lock replaced by centralized queue. Keeping minimal guard for timer drift.
-        private readonly object _operationLock = new object();
-        private bool _isOperationInProgress = false;
 
         public event Action<Ad> AdPublished;
         public event Action<Ad> AdUnpublished;
@@ -65,48 +62,18 @@ namespace DoskaYkt_AutoManagement.Core
                 {
                     timer.Stop();
 
-                    // Минимальная защита от лавины таймеров: небольшая де-буфферизация
-                    lock (_operationLock)
+                    TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Ставим снятие в очередь...");
+
+                    // Дальше реальную работу делает ViewModel через очередь
+                    var acc = AccountManager.Instance.SelectedAccount;
+                    if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
                     {
-                        if (_isOperationInProgress)
-                        {
-                            var retryDelay = new Random().Next(5000, 15000);
-                            TerminalLogger.Instance.Log($"[Scheduler] Таймер снятия совпал с другой операцией, отложим '{ad.Title}' на {retryDelay/1000}s");
-                            var delayTimer = new Timer(retryDelay) { AutoReset = false };
-                            delayTimer.Elapsed += (ds, de) => { delayTimer.Dispose(); StartForAd(ad); };
-                            delayTimer.Start();
-                            return;
-                        }
-                        _isOperationInProgress = true;
+                        AdUnpublishRequested?.Invoke(ad);
                     }
-
-                    try
+                    else
                     {
-                        // Небольшой джиттер перед постановкой в очередь
-                        var randomDelay = new Random().Next(2000, 7000);
-                        TerminalLogger.Instance.Log($"[Scheduler] Джиттер {randomDelay/1000}s перед снятием '{ad.Title}'");
-                        await Task.Delay(randomDelay);
-
-                        TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Начинаем снятие с публикации...");
-
-                        // Дальше реальную работу делает ViewModel через очередь
-                        var acc = AccountManager.Instance.SelectedAccount;
-                        if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
-                        {
-                            AdUnpublishRequested?.Invoke(ad);
-                        }
-                        else
-                        {
-                            ad.IsPublished = false;
-                            ad.IsPublishedOnSite = false;
-                        }
-                    }
-                    finally
-                    {
-                        lock (_operationLock)
-                        {
-                            _isOperationInProgress = false;
-                        }
+                        ad.IsPublished = false;
+                        ad.IsPublishedOnSite = false;
                     }
 
                     // Настраиваем дату следующей публикации
@@ -155,48 +122,18 @@ namespace DoskaYkt_AutoManagement.Core
                 {
                     timer.Stop();
 
-                    // Минимальная защита от лавины таймеров: небольшая де-буфферизация
-                    lock (_operationLock)
+                    TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Ставим публикацию в очередь...");
+
+                    // Дальше реальную работу делает ViewModel через очередь
+                    var acc = AccountManager.Instance.SelectedAccount;
+                    if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
                     {
-                        if (_isOperationInProgress)
-                        {
-                            var retryDelay = new Random().Next(2000, 7000);
-                            TerminalLogger.Instance.Log($"[Scheduler] Таймер публикации совпал с другой операцией, отложим '{ad.Title}' на {retryDelay/1000}s");
-                            var delayTimer = new Timer(retryDelay) { AutoReset = false };
-                            delayTimer.Elapsed += (ds, de) => { delayTimer.Dispose(); StartForAd(ad); };
-                            delayTimer.Start();
-                            return;
-                        }
-                        _isOperationInProgress = true;
+                        AdPublishRequested?.Invoke(ad);
                     }
-
-                    try
+                    else
                     {
-                        // Небольшой джиттер перед постановкой в очередь
-                        var randomDelay = new Random().Next(2000, 7000);
-                        TerminalLogger.Instance.Log($"[Scheduler] Джиттер {randomDelay/1000}s перед публикацией '{ad.Title}'");
-                        await Task.Delay(randomDelay);
-
-                        TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Начинаем публикацию...");
-
-                        // Дальше реальную работу делает ViewModel через очередь
-                        var acc = AccountManager.Instance.SelectedAccount;
-                        if (acc != null && !string.IsNullOrEmpty(ad.SiteId))
-                        {
-                            AdPublishRequested?.Invoke(ad);
-                        }
-                        else
-                        {
-                            ad.IsPublished = true;
-                            ad.IsPublishedOnSite = true;
-                        }
-                    }
-                    finally
-                    {
-                        lock (_operationLock)
-                        {
-                            _isOperationInProgress = false;
-                        }
+                        ad.IsPublished = true;
+                        ad.IsPublishedOnSite = true;
                     }
 
                     // Настраиваем дату следующего снятия
