@@ -48,7 +48,14 @@ namespace DoskaYkt_AutoManagement.Core
             Task.Run(async () =>
             {
                 try { await _browserSession.CloseAsync(); } catch { }
+                try { _authService.ResetAuth(); } catch { }
             });
+        }
+
+        public async Task CloseSessionAsync()
+        {
+            try { await _browserSession.CloseAsync(); } catch { }
+            try { _authService.ResetAuth(); } catch { }
         }
 
         // ===== Auth =====

@@ -285,11 +285,8 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             if (selected.Count == 0) return;
 
             // Распределяем старты: шаг в минутах + небольшой случайный джиттер
-            var stepSec = Math.Max(0, Properties.Settings.Default.SchedulerStepSeconds);
-            var useJitter = Properties.Settings.Default.SchedulerUseJitter;
-            var jitterMin = Math.Max(0, Properties.Settings.Default.SchedulerJitterMinSec);
-            var jitterMax = Math.Max(jitterMin, Properties.Settings.Default.SchedulerJitterMaxSec);
-            var rnd = new Random();
+            // Enforce deterministic stagger by sort order: 1 second between items, no jitter
+            var stepSec = 1;
 
             for (int i = 0; i < selected.Count; i++)
             {
@@ -301,16 +298,14 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 if (ad.IsPublished)
                 {
                     var baseOffset = TimeSpan.FromSeconds(i * stepSec);
-                    var jitter = useJitter ? TimeSpan.FromSeconds(rnd.Next(jitterMin, jitterMax + 1)) : TimeSpan.Zero;
-                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(minutes).Add(baseOffset).Add(jitter);
+                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(minutes).Add(baseOffset);
                     ad.NextRepublishAt = null;
                     TerminalLogger.Instance.Log($"[Timers] Для '{ad.Title}' установлен таймер снятия через {minutes} мин.");
                 }
                 else
                 {
                     var baseOffset = TimeSpan.FromSeconds(i * stepSec);
-                    var jitter = useJitter ? TimeSpan.FromSeconds(rnd.Next(jitterMin, jitterMax + 1)) : TimeSpan.Zero;
-                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput).Add(baseOffset).Add(jitter);
+                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput).Add(baseOffset);
                     ad.NextUnpublishAt = null;
                     TerminalLogger.Instance.Log($"[Timers] Для '{ad.Title}' установлен таймер публикации через {PublishMinutesInput} мин.");
                 }
@@ -340,11 +335,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             var selected = GetSelectedAds();
             if (selected.Count == 0) return;
 
-            var stepSec = Math.Max(0, Properties.Settings.Default.SchedulerStepSeconds);
-            var useJitter = Properties.Settings.Default.SchedulerUseJitter;
-            var jitterMin = Math.Max(0, Properties.Settings.Default.SchedulerJitterMinSec);
-            var jitterMax = Math.Max(jitterMin, Properties.Settings.Default.SchedulerJitterMaxSec);
-            var rnd = new Random();
+            var stepSec = 1; // deterministic 1s stagger
 
             for (int i = 0; i < selected.Count; i++)
             {
@@ -356,15 +347,13 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 if (ad.IsPublished)
                 {
                     var baseOffset = TimeSpan.FromSeconds(i * stepSec);
-                    var jitter = useJitter ? TimeSpan.FromSeconds(rnd.Next(jitterMin, jitterMax + 1)) : TimeSpan.Zero;
-                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput).Add(baseOffset).Add(jitter);
+                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput).Add(baseOffset);
                     ad.NextRepublishAt = null;
                 }
                 else
                 {
                     var baseOffset = TimeSpan.FromSeconds(i * stepSec);
-                    var jitter = useJitter ? TimeSpan.FromSeconds(rnd.Next(jitterMin, jitterMax + 1)) : TimeSpan.Zero;
-                    ad.NextRepublishAt = DateTime.Now.AddMinutes(minutes).Add(baseOffset).Add(jitter);
+                    ad.NextRepublishAt = DateTime.Now.AddMinutes(minutes).Add(baseOffset);
                     ad.NextUnpublishAt = null;
                 }
 
@@ -386,11 +375,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             var selected = GetSelectedAds();
             if (selected.Count == 0) return;
 
-            var stepSec = Math.Max(0, Properties.Settings.Default.SchedulerStepSeconds);
-            var useJitter = Properties.Settings.Default.SchedulerUseJitter;
-            var jitterMin = Math.Max(0, Properties.Settings.Default.SchedulerJitterMinSec);
-            var jitterMax = Math.Max(jitterMin, Properties.Settings.Default.SchedulerJitterMaxSec);
-            var rnd = new Random();
+            var stepSec = 1; // deterministic 1s stagger
 
             for (int i = 0; i < selected.Count; i++)
             {
@@ -400,16 +385,15 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 ad.IsAutoRaiseEnabled = true;
 
                 var baseOffset = TimeSpan.FromSeconds(i * stepSec);
-                var jitter = useJitter ? TimeSpan.FromSeconds(rnd.Next(jitterMin, jitterMax + 1)) : TimeSpan.Zero;
 
                 if (ad.IsPublished)
                 {
-                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(unpubMinutes).Add(baseOffset).Add(jitter);
+                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(unpubMinutes).Add(baseOffset);
                     ad.NextRepublishAt = null;
                 }
                 else
                 {
-                    ad.NextRepublishAt = DateTime.Now.AddMinutes(pubMinutes).Add(baseOffset).Add(jitter);
+                    ad.NextRepublishAt = DateTime.Now.AddMinutes(pubMinutes).Add(baseOffset);
                     ad.NextUnpublishAt = null;
                 }
 

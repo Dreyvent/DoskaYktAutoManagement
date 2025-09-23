@@ -62,84 +62,9 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             }
         }
 
-        // Переключатель скрытия CMD окна драйвера
-        private bool _hideDriverWindow = Properties.Settings.Default.HideDriverWindow;
-        public bool HideDriverWindow
-        {
-            get => _hideDriverWindow;
-            set
-            {
-                if (_hideDriverWindow != value)
-                {
-                    _hideDriverWindow = value;
-                    Properties.Settings.Default.HideDriverWindow = value;
-                    Properties.Settings.Default.Save();
-                    OnPropertyChanged();
-                }
-            }
-        }
+        // Removed legacy HideDriverWindow (Selenium)
 
-        // Настройки шедулера (персистятся в Properties.Settings)
-        public int SchedulerStepSeconds
-        {
-            get => Properties.Settings.Default.SchedulerStepSeconds;
-            set
-            {
-                if (Properties.Settings.Default.SchedulerStepSeconds != value)
-                {
-                    Properties.Settings.Default.SchedulerStepSeconds = Math.Max(0, value);
-                    Properties.Settings.Default.Save();
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public bool SchedulerUseJitter
-        {
-            get => Properties.Settings.Default.SchedulerUseJitter;
-            set
-            {
-                if (Properties.Settings.Default.SchedulerUseJitter != value)
-                {
-                    Properties.Settings.Default.SchedulerUseJitter = value;
-                    Properties.Settings.Default.Save();
-                    OnPropertyChanged();
-                }
-            }
-        }
-
-        public int SchedulerJitterMinSec
-        {
-            get => Properties.Settings.Default.SchedulerJitterMinSec;
-            set
-            {
-                var min = Math.Max(0, value);
-                if (Properties.Settings.Default.SchedulerJitterMinSec != min)
-                {
-                    Properties.Settings.Default.SchedulerJitterMinSec = min;
-                    if (Properties.Settings.Default.SchedulerJitterMaxSec < min)
-                        Properties.Settings.Default.SchedulerJitterMaxSec = min;
-                    Properties.Settings.Default.Save();
-                    OnPropertyChanged();
-                    OnPropertyChanged(nameof(SchedulerJitterMaxSec));
-                }
-            }
-        }
-
-        public int SchedulerJitterMaxSec
-        {
-            get => Properties.Settings.Default.SchedulerJitterMaxSec;
-            set
-            {
-                var max = Math.Max(SchedulerJitterMinSec, value);
-                if (Properties.Settings.Default.SchedulerJitterMaxSec != max)
-                {
-                    Properties.Settings.Default.SchedulerJitterMaxSec = max;
-                    Properties.Settings.Default.Save();
-                    OnPropertyChanged();
-                }
-            }
-        }
+        // Удалены устаревшие настройки шедулера (шаг/джиттер)
 
         public int RepostDelayMinSec
         {
@@ -179,7 +104,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         public AsyncRelayCommand SaveSelectedCommand { get; }
         public RelayCommand SelectAllFoundCommand { get; }
         public RelayCommand ClearFoundSelectionCommand { get; }
-        public RelayCommand EndSessionCommand { get; }
+        public AsyncRelayCommand EndSessionCommand { get; }
 
         private readonly ISiteAutomation _service = SiteAutomationProvider.Current;
 
@@ -201,10 +126,20 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 foreach (var ad in FoundAds) ad.IsSelected = false;
                 OnPropertyChanged(nameof(SelectedFoundAds));
             });
-            EndSessionCommand = new RelayCommand(() =>
+            EndSessionCommand = new AsyncRelayCommand(async () =>
             {
+                StatusMessage = "Завершаем сеанс браузера...";
+                if (_service is DoskaYktService)
+                {
+                    try { await ((DoskaYktService)_service).CloseSessionAsync(); }
+                    catch { }
+                }
+                else
+                {
+                    // Fallback to fire-and-forget if other implementation
+                    _service.CloseSession();
+                }
                 StatusMessage = "Сеанс браузера завершён.";
-                _service.CloseSession();
                 Core.TerminalLogger.Instance.Log("[Session] Сеанс браузера закрыт пользователем.");
             });
 

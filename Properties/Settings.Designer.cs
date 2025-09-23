@@ -25,7 +25,7 @@ namespace DoskaYkt_AutoManagement.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool BrowserVisible {
             get {
                 return ((bool)(this["BrowserVisible"]));
@@ -34,7 +34,7 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["BrowserVisible"] = value;
             }
         }
-
+        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("30")]
@@ -46,7 +46,7 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["UnpublishDelayMinutes"] = value;
             }
         }
-
+        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("10")]
@@ -61,18 +61,6 @@ namespace DoskaYkt_AutoManagement.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool HideDriverWindow {
-            get {
-                return ((bool)(this["HideDriverWindow"]));
-            }
-            set {
-                this["HideDriverWindow"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("Title")]
         public string MyAdsSortBy {
             get {
@@ -82,7 +70,7 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["MyAdsSortBy"] = value;
             }
         }
-
+        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
@@ -94,55 +82,7 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["MyAdsSortAsc"] = value;
             }
         }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("10")]
-        public int SchedulerStepSeconds {
-            get {
-                return ((int)(this["SchedulerStepSeconds"]));
-            }
-            set {
-                this["SchedulerStepSeconds"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool SchedulerUseJitter {
-            get {
-                return ((bool)(this["SchedulerUseJitter"]));
-            }
-            set {
-                this["SchedulerUseJitter"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("5")]
-        public int SchedulerJitterMinSec {
-            get {
-                return ((int)(this["SchedulerJitterMinSec"]));
-            }
-            set {
-                this["SchedulerJitterMinSec"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("30")]
-        public int SchedulerJitterMaxSec {
-            get {
-                return ((int)(this["SchedulerJitterMaxSec"]));
-            }
-            set {
-                this["SchedulerJitterMaxSec"] = value;
-            }
-        }
-
+        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("3")]
@@ -154,7 +94,7 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["RepostDelayMinSec"] = value;
             }
         }
-
+        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("8")]
@@ -166,7 +106,7 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["RepostDelayMaxSec"] = value;
             }
         }
-
+        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]

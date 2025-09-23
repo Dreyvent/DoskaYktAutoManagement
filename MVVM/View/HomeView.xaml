@@ -87,41 +87,6 @@
                                    VerticalAlignment="Center" 
                                    Foreground="White" 
                                    FontSize="16"/>
-                        <TextBlock Grid.Row="1" 
-                                   Grid.Column="0" 
-                                   Text="Браузер:" 
-                                   VerticalAlignment="Center" 
-                                   Foreground="White" 
-                                   FontSize="16" 
-                                   Margin="0,0,5,0"/>
-                        <ComboBox Grid.Row="1" 
-                                  Grid.Column="1" 
-                                  SelectedIndex="0" 
-                                  Foreground="Black" 
-                                  Width="100" 
-                                  HorizontalAlignment="Left" 
-                                  ToolTip="Выберите браузер для работы">
-                            <ComboBoxItem Content="Chrome"/>
-                            <ComboBoxItem Content="Firefox"/>
-                        </ComboBox>
-                        <TextBlock Grid.Row="1" 
-                                   Grid.Column="2" 
-                                   Text="Скрыть CMD драйвера:" 
-                                   VerticalAlignment="Center" 
-                                   Foreground="White" 
-                                   FontSize="16" 
-                                   Margin="10,0,5,0"/>
-                        <ToggleButton Grid.Column="3" 
-                                      Grid.Row="1" 
-                                      HorizontalAlignment="Left" 
-                                      x:Name="HideDriverToggle" 
-                                      Content="Да" 
-                                      Width="60" 
-                                      Height="30" 
-                                      IsChecked="{Binding HideDriverWindow, Mode=TwoWay}" 
-                                      Background="Gray" 
-                                      Foreground="White" 
-                                      ToolTip="Скрыть окно командной строки драйвера Selenium"/>
                     </Grid>
                 </StackPanel>
             </Border>
@@ -184,32 +149,6 @@
                                Foreground="White"
                                FontSize="28"
                                Margin="0,0,0,10"/>
-                    <Grid Margin="5">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="auto"/>
-                            <ColumnDefinition Width="120"/>
-                            <ColumnDefinition Width="20"/>
-                            <ColumnDefinition Width="auto"/>
-                            <ColumnDefinition Width="120"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="auto"/>
-                            <RowDefinition Height="auto"/>
-                            <RowDefinition Height="auto"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Шаг между объявлениями (сек):" Foreground="White" VerticalAlignment="Center"/>
-                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SchedulerStepSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-
-                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Использовать задержку:" Foreground="White" VerticalAlignment="Center"/>
-                        <CheckBox Grid.Row="1" Grid.Column="1" IsChecked="{Binding SchedulerUseJitter, Mode=TwoWay}"/>
-
-                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Задержка (мин-макс, сек):" Foreground="White" VerticalAlignment="Center"/>
-                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SchedulerJitterMinSec, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                        <TextBlock Grid.Row="2" Grid.Column="2" Text="-" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <TextBox Grid.Row="2" Grid.Column="4" Text="{Binding SchedulerJitterMaxSec, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                    </Grid>
-
                     <Grid Margin="5,10,5,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="auto"/>

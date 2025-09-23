@@ -13,6 +13,7 @@ namespace DoskaYkt_AutoManagement.Core
         string CurrentLogin { get; }
 
         void CloseSession();
+        Task CloseSessionAsync();
 
         Task<bool> LoginAsync(string login, string password, bool showBrowser, CancellationToken cancellationToken = default);
 

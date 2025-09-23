@@ -3,7 +3,7 @@
   <Profiles />
   <Settings>
     <Setting Name="BrowserVisible" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
+      <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="UnpublishDelayMinutes" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">30</Value>
@@ -11,26 +11,11 @@
     <Setting Name="RepublishDelayMinutes" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">10</Value>
     </Setting>
-    <Setting Name="HideDriverWindow" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
-    </Setting>
     <Setting Name="MyAdsSortBy" Type="System.String" Scope="User">
       <Value Profile="(Default)">Title</Value>
     </Setting>
     <Setting Name="MyAdsSortAsc" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
-    </Setting>
-    <Setting Name="SchedulerStepSeconds" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">10</Value>
-    </Setting>
-    <Setting Name="SchedulerUseJitter" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
-    </Setting>
-    <Setting Name="SchedulerJitterMinSec" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">5</Value>
-    </Setting>
-    <Setting Name="SchedulerJitterMaxSec" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">30</Value>
     </Setting>
     <Setting Name="RepostDelayMinSec" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">3</Value>

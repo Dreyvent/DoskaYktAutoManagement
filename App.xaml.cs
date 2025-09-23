@@ -6,6 +6,7 @@ using System.Drawing;
 using System.IO;
 using Forms = System.Windows.Forms;
 using DoskaYkt_AutoManagement.Core;
+using Microsoft.Playwright;
 
 namespace DoskaYkt_AutoManagement
 {
@@ -55,6 +56,23 @@ namespace DoskaYkt_AutoManagement
                     Dispatcher.BeginInvoke(new Action(MinimizeToTray));
                 }
             };
+
+            // Установка браузеров Playwright при первом запуске (если не установлены)
+            try
+            {
+                var pwCache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ms-playwright");
+                bool needInstall = !Directory.Exists(pwCache) || Directory.GetDirectories(pwCache).Length == 0;
+                if (needInstall)
+                {
+                    Core.TerminalLogger.Instance.Log("[Playwright] Устанавливаем браузеры...");
+                    await System.Threading.Tasks.Task.Run(() => Microsoft.Playwright.Program.Main(new[] { "install", "chromium" }));
+                    Core.TerminalLogger.Instance.Log("[Playwright] Установка браузеров завершена.");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Core.TerminalLogger.Instance.LogError("[Playwright] Ошибка установки браузеров", ex);
+            }
 
             // 4) Показываем окно
             MainWindow.Show();

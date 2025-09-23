@@ -24,10 +24,6 @@ namespace DoskaYkt_AutoManagement.Converters
 
     public class BooleanNegationConverter : IValueConverter
     {
-        public BooleanNegationConverter()
-        {
-        }
-
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value is bool b) return !b;

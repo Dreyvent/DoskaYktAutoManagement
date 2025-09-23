@@ -71,5 +71,11 @@ namespace DoskaYkt_AutoManagement.Core.Auth
             catch { }
             finally { _isLoggedIn = false; _currentLogin = null; }
         }
+
+        public void ResetAuth()
+        {
+            _isLoggedIn = false;
+            _currentLogin = null;
+        }
     }
 }

@@ -9,5 +9,6 @@ namespace DoskaYkt_AutoManagement.Core.Auth
         string CurrentLogin { get; }
         Task<bool> LoginAsync(string login, string password, bool showBrowser, CancellationToken cancellationToken = default);
         Task LogoutAsync();
+        void ResetAuth();
     }
 }

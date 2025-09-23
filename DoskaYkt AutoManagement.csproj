@@ -10,14 +10,14 @@
 		<StartupObject>DoskaYkt_AutoManagement.App</StartupObject>
 		<ApplicationIcon>Images\DoskaYkt-Favicon.ico</ApplicationIcon>
 		<Description>Автоматическое создание и удаление объявлений в сайте DoskaYkt</Description>
-		<FileVersion>0.7.0</FileVersion>
+		<FileVersion>0.7.1</FileVersion>
 		<NeutralLanguage>ru</NeutralLanguage>
 		<Title>DoskaYkt ADAutoManagement</Title>
 		<Company>Arch Kitsune Studio</Company>
 		<Copyright>(c) 2025 Arch Kitsune Studio/Andrey Dedyukin. All rights reserved.</Copyright>
 		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
 		<EnableDefaultPageItems>false</EnableDefaultPageItems>
-		<Version>0.7.0</Version>
+		<Version>0.7.1</Version>
 		<PlatformTarget>AnyCPU</PlatformTarget>
 		<AssemblyTitle>DoskaYkt AutoManagement</AssemblyTitle>
 		<AssemblyDescription>Автоматическое управление объявлениями на DoskaYkt</AssemblyDescription>
