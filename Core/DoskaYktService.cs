@@ -23,6 +23,7 @@ namespace DoskaYkt_AutoManagement.Core
         private IWebDriver _driver;
         private WebDriverWait _wait;
         private string _lastDriverKind; // "chrome" | "firefox"
+        private readonly object _sessionLock = new object();
 
         public static DoskaYktService Instance
         {
@@ -117,40 +118,44 @@ namespace DoskaYkt_AutoManagement.Core
         private void EnsureSession(bool showChrome)
         {
             if (_driver != null) return;
+            lock (_sessionLock)
+            {
+                if (_driver != null) return;
 
-            var options = BuildChromeOptions(showChrome);
-            options.AddExcludedArgument("enable-automation");
-            options.AddAdditionalOption("useAutomationExtension", false);
-            
-            // Дополнительные опции для стабильности
-            if (Properties.Settings.Default.HideDriverWindow)
-            {
-                options.AddArgument("--disable-gpu");
-                options.AddArgument("--no-sandbox");
-                options.AddArgument("--disable-dev-shm-usage");
-            }
+                var options = BuildChromeOptions(showChrome);
+                options.AddExcludedArgument("enable-automation");
+                options.AddAdditionalOption("useAutomationExtension", false);
+                
+                // Дополнительные опции для стабильности
+                if (Properties.Settings.Default.HideDriverWindow)
+                {
+                    options.AddArgument("--disable-gpu");
+                    options.AddArgument("--no-sandbox");
+                    options.AddArgument("--disable-dev-shm-usage");
+                }
 
-            try
-            {
-                // Создаём сервис драйвера с правильным скрытием CMD окна
-                var service = ChromeDriverService.CreateDefaultService();
-                service.HideCommandPromptWindow = Properties.Settings.Default.HideDriverWindow;
-                
-                _driver = new ChromeDriver(service, options);
-                _lastDriverKind = "chrome";
-                _wait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(500));
-                
-                // Устанавливаем таймауты для стабильности
-                _driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
-                _driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(60);
-                _driver.Manage().Timeouts().AsynchronousJavaScript = TimeSpan.FromSeconds(30);
-                
-                TerminalLogger.Instance.Log($"[Session] ChromeDriver создан (HideCMD={Properties.Settings.Default.HideDriverWindow})");
-            }
-            catch (Exception ex)
-            {
-                TerminalLogger.Instance.Log($"[Session] Ошибка создания драйвера: {ex.Message}");
-                throw;
+                try
+                {
+                    // Создаём сервис драйвера с правильным скрытием CMD окна
+                    var service = ChromeDriverService.CreateDefaultService();
+                    service.HideCommandPromptWindow = Properties.Settings.Default.HideDriverWindow;
+                    
+                    _driver = new ChromeDriver(service, options);
+                    _lastDriverKind = "chrome";
+                    _wait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(60), TimeSpan.FromMilliseconds(500));
+                    
+                    // Устанавливаем таймауты для стабильности
+                    _driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(10);
+                    _driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(60);
+                    _driver.Manage().Timeouts().AsynchronousJavaScript = TimeSpan.FromSeconds(30);
+                    
+                    TerminalLogger.Instance.Log($"[Session] ChromeDriver создан (HideCMD={Properties.Settings.Default.HideDriverWindow})");
+                }
+                catch (Exception ex)
+                {
+                    TerminalLogger.Instance.Log($"[Session] Ошибка создания драйвера: {ex.Message}");
+                    throw;
+                }
             }
         }
 
@@ -311,16 +316,45 @@ namespace DoskaYkt_AutoManagement.Core
                 
                 if (isEmpty)
                 {
-                    Core.TerminalLogger.Instance.Log("[CheckAds] Список объявлений пуст, возвращаем пустой результат");
-                    return (true, "Список объявлений пуст", ads);
+                    // Фоллбек: иногда список пуст из-за ленивой подгрузки/кэша. Пытаемся перезагрузить 1 раз.
+                    try
+                    {
+                        _driver.Navigate().Refresh();
+                        profileWait.Until(d => { try { return ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").ToString() == "complete"; } catch { return false; } });
+                        var empty2 = _driver.FindElements(By.CssSelector("div.d-pc_no_posts_title"));
+                        if (empty2.Any())
+                        {
+                            Core.TerminalLogger.Instance.Log("[CheckAds] Список объявлений пуст, возвращаем пустой результат");
+                            return (true, "Список объявлений пуст", ads);
+                        }
+                    }
+                    catch { }
                 }
                 // Собираем объявления только из профиля
+                // Пытаемся подгрузить все элементы: прокрутка вниз несколько раз
                 var adElements = _driver.FindElements(By.CssSelector("div.d-post_desc"));
                 if (!adElements.Any())
                 {
                     // Фоллбек: пробуем другие контейнеры
                     adElements = _driver.FindElements(By.CssSelector("div.d-post, a.d-post_link"));
                 }
+
+                try
+                {
+                    int scrollTries = 0;
+                    int lastCount = adElements.Count;
+                    while (scrollTries < 20) // достаточное число попыток для 200+
+                    {
+                        ((IJavaScriptExecutor)_driver).ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
+                        Thread.Sleep(500);
+                        var current = _driver.FindElements(By.CssSelector("div.d-post_desc"));
+                        var currentCount = current.Count;
+                        if (currentCount <= lastCount) { scrollTries++; }
+                        else { lastCount = currentCount; scrollTries = 0; }
+                        adElements = current;
+                    }
+                }
+                catch { }
 
                 foreach (var descEl in adElements)
                 {
@@ -625,17 +659,47 @@ namespace DoskaYkt_AutoManagement.Core
 
                         Core.TerminalLogger.Instance.Log("[Unpublish] Открываем профиль /profile/posts");
                     _driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
-                    var profileWait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(90), TimeSpan.FromMilliseconds(300));
-                    profileWait.Until(d => { try { return ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").ToString() == "complete"; } catch { return false; } });
-                        
-                        // Проверяем, есть ли сообщение о пустом списке
-                    var emptyMessage = _driver.FindElements(By.CssSelector("div.d-pc_no_posts_title"));
+                        var profileWait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(90), TimeSpan.FromMilliseconds(300));
+                        profileWait.Until(d => { try { return ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").ToString() == "complete"; } catch { return false; } });
+
+                        // Проверяем, есть ли сообщение о пустом списке, с фоллбеком на обновление и попытку подгрузки
+                        var emptyMessage = _driver.FindElements(By.CssSelector("div.d-pc_no_posts_title"));
                         if (emptyMessage.Any())
+                        {
+                            Core.TerminalLogger.Instance.Log("[Unpublish] Список объявлений пуст — пробуем обновить страницу");
+                            try
+                            {
+                                _driver.Navigate().Refresh();
+                                profileWait.Until(d => { try { return ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").ToString() == "complete"; } catch { return false; } });
+                                emptyMessage = _driver.FindElements(By.CssSelector("div.d-pc_no_posts_title"));
+                            }
+                            catch { }
+                        }
+                        if (!emptyMessage.Any())
+                        {
+                            // Пытаемся лениво подгрузить элементы прокруткой
+                            try
+                            {
+                                int scrollTries = 0;
+                                int lastCount = _driver.FindElements(By.CssSelector(".d-post")).Count;
+                                while (scrollTries < 10)
+                                {
+                                    ((IJavaScriptExecutor)_driver).ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
+                                    Thread.Sleep(500);
+                                    var currentCount = _driver.FindElements(By.CssSelector(".d-post")).Count;
+                                    if (currentCount <= lastCount) scrollTries++;
+                                    else { lastCount = currentCount; scrollTries = 0; }
+                                }
+                            }
+                            catch { }
+                        }
+                        else
                         {
                             Core.TerminalLogger.Instance.Log("[Unpublish] Список объявлений пуст, нечего снимать с публикации");
                             return false;
                         }
-                    profileWait.Until(d => d.FindElements(By.CssSelector(".d-post"))?.Any() == true);
+
+                        profileWait.Until(d => d.FindElements(By.CssSelector(".d-post"))?.Any() == true);
 
                         string idToUse = Regex.IsMatch(adId ?? string.Empty, @"^\d+$") ? adId : null;
                         if (idToUse == null && !string.IsNullOrWhiteSpace(adTitle))
@@ -725,6 +789,26 @@ namespace DoskaYkt_AutoManagement.Core
                                     }
                                 }
 
+                                // Убедиться, что petite-vue обработала выбор и кнопка стала активной
+                                try
+                                {
+                                    var confirmBtn = _wait.Until(d => d.FindElements(By.CssSelector("button.d-cancel_reason-modal-delete")).FirstOrDefault());
+                                    // Ждём пока атрибут disabled исчезнет и кнопка станет кликабельной
+                                    _wait.Until(d =>
+                                    {
+                                        try
+                                        {
+                                            var btn = d.FindElements(By.CssSelector("button.d-cancel_reason-modal-delete")).FirstOrDefault();
+                                            if (btn == null) return false;
+                                            var disabledAttr = btn.GetAttribute("disabled");
+                                            var classAttr = btn.GetAttribute("class") ?? string.Empty;
+                                            return string.IsNullOrEmpty(disabledAttr) && !classAttr.Contains("disabled");
+                                        }
+                                        catch { return false; }
+                                    });
+                                }
+                                catch { }
+
                                 // Подтверждение в модалке
                                 if (!JsClickWithRetries(() => _wait.Until(d => d.FindElements(By.CssSelector("button.d-cancel_reason-modal-delete")).FirstOrDefault()), $"Confirm unpublish {idToUse}"))
                                     return false;
@@ -813,6 +897,24 @@ namespace DoskaYkt_AutoManagement.Core
 
                                 // Ждём редирект на страницу объявления /{id}
                                 _wait.Until(d => { try { var url = d.Url ?? string.Empty; return Regex.IsMatch(url, @"https://doska\.ykt\.ru/\d+$"); } catch { return false; } });
+
+                                // Верифицируем, что объявление появилось среди активных
+                                try
+                                {
+                                    _driver.Navigate().GoToUrl("https://doska.ykt.ru/profile/posts");
+                                    var profileWait = new WebDriverWait(new SystemClock(), _driver, TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(300));
+                                    profileWait.Until(d => { try { return ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").ToString() == "complete"; } catch { return false; } });
+                                    profileWait.Until(d => d.FindElements(By.CssSelector(".d-post")).Any() || d.FindElements(By.CssSelector("div.d-pc_no_posts_title")).Any());
+                                    var foundActive = _driver.FindElements(By.CssSelector(".d-post .d-post_info-service span"))
+                                                            .Any(s => (s.Text ?? string.Empty).Contains(adId));
+                                    if (!foundActive)
+                                    {
+                                        Core.TerminalLogger.Instance.Log($"[RepublishAd] После активации {adId} не найдено среди активных — считаем неуспешным");
+                                        return false;
+                                    }
+                                }
+                                catch { return false; }
+
                                 return true;
                             }
                             catch { }
@@ -835,7 +937,9 @@ namespace DoskaYkt_AutoManagement.Core
             var unpub = await UnpublishAdAsync(login, password, siteId, true, title);
             if (!unpub) return false;
 
-            await Task.Delay(TimeSpan.FromSeconds(new Random().Next(3, 8)));
+            var minSec = Math.Max(0, Properties.Settings.Default.RepostDelayMinSec);
+            var maxSec = Math.Max(minSec, Properties.Settings.Default.RepostDelayMaxSec);
+            await Task.Delay(TimeSpan.FromSeconds(new Random().Next(minSec, maxSec + 1)));
 
             return await RepublishAdAsync(login, password, siteId, true);
         }

@@ -79,6 +79,101 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             }
         }
 
+        // Настройки шедулера (персистятся в Properties.Settings)
+        public int SchedulerStepSeconds
+        {
+            get => Properties.Settings.Default.SchedulerStepSeconds;
+            set
+            {
+                if (Properties.Settings.Default.SchedulerStepSeconds != value)
+                {
+                    Properties.Settings.Default.SchedulerStepSeconds = Math.Max(0, value);
+                    Properties.Settings.Default.Save();
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public bool SchedulerUseJitter
+        {
+            get => Properties.Settings.Default.SchedulerUseJitter;
+            set
+            {
+                if (Properties.Settings.Default.SchedulerUseJitter != value)
+                {
+                    Properties.Settings.Default.SchedulerUseJitter = value;
+                    Properties.Settings.Default.Save();
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public int SchedulerJitterMinSec
+        {
+            get => Properties.Settings.Default.SchedulerJitterMinSec;
+            set
+            {
+                var min = Math.Max(0, value);
+                if (Properties.Settings.Default.SchedulerJitterMinSec != min)
+                {
+                    Properties.Settings.Default.SchedulerJitterMinSec = min;
+                    if (Properties.Settings.Default.SchedulerJitterMaxSec < min)
+                        Properties.Settings.Default.SchedulerJitterMaxSec = min;
+                    Properties.Settings.Default.Save();
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(SchedulerJitterMaxSec));
+                }
+            }
+        }
+
+        public int SchedulerJitterMaxSec
+        {
+            get => Properties.Settings.Default.SchedulerJitterMaxSec;
+            set
+            {
+                var max = Math.Max(SchedulerJitterMinSec, value);
+                if (Properties.Settings.Default.SchedulerJitterMaxSec != max)
+                {
+                    Properties.Settings.Default.SchedulerJitterMaxSec = max;
+                    Properties.Settings.Default.Save();
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public int RepostDelayMinSec
+        {
+            get => Properties.Settings.Default.RepostDelayMinSec;
+            set
+            {
+                var min = Math.Max(0, value);
+                if (Properties.Settings.Default.RepostDelayMinSec != min)
+                {
+                    Properties.Settings.Default.RepostDelayMinSec = min;
+                    if (Properties.Settings.Default.RepostDelayMaxSec < min)
+                        Properties.Settings.Default.RepostDelayMaxSec = min;
+                    Properties.Settings.Default.Save();
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(RepostDelayMaxSec));
+                }
+            }
+        }
+
+        public int RepostDelayMaxSec
+        {
+            get => Properties.Settings.Default.RepostDelayMaxSec;
+            set
+            {
+                var max = Math.Max(RepostDelayMinSec, value);
+                if (Properties.Settings.Default.RepostDelayMaxSec != max)
+                {
+                    Properties.Settings.Default.RepostDelayMaxSec = max;
+                    Properties.Settings.Default.Save();
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         // Команды
         public AsyncRelayCommand CheckAdsCommand { get; }
         public AsyncRelayCommand SaveSelectedCommand { get; }
@@ -108,6 +203,14 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             });
             EndSessionCommand = new RelayCommand(() =>
             {
+                try
+                {
+                    var result = System.Windows.MessageBox.Show(
+                        "Закрыть текущий сеанс браузера?", "Подтверждение",
+                        System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question);
+                    if (result != System.Windows.MessageBoxResult.Yes) return;
+                }
+                catch { }
                 StatusMessage = "Сеанс браузера завершён.";
                 _service.CloseSession();
             });
@@ -129,8 +232,17 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         // Навигация: будет установлена из MainViewModel
         public Action NavigateToMyAds { get; set; }
 
+        private bool _isScanning;
+        public bool IsScanning
+        {
+            get => _isScanning;
+            set { _isScanning = value; OnPropertyChanged(); }
+        }
+
         private async Task CheckAdsAsync()
         {
+            if (IsScanning) return;
+            IsScanning = true;
             StatusMessage = "Запуск проверки объявлений...";
             FoundAds.Clear();
             FoundAdsView.Refresh();
@@ -208,6 +320,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             {
                 Core.TerminalLogger.Instance.Log("[CheckAds] Ошибка при сканировании неопубликованных объявлений, но опубликованные найдены");
             }
+            IsScanning = false;
         }
 
         private void ApplyFoundSort()

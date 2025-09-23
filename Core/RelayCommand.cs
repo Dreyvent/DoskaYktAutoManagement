@@ -32,8 +32,8 @@ namespace DoskaYkt_AutoManagement.Core
             }
             catch (Exception ex)
             {
-                // логирование или обработка ошибок
-                Console.WriteLine(ex);
+                // Логируем в общий терминал, чтобы пользователю было видно
+                try { TerminalLogger.Instance.LogError("[Command] Ошибка выполнения команды", ex); } catch { }
             }
             finally
             {

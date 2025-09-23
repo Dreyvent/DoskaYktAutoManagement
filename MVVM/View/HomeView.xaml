@@ -5,6 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:DoskaYkt_AutoManagement.MVVM.View"
              xmlns:viewModel="clr-namespace:DoskaYkt_AutoManagement.MVVM.ViewModel"
+             xmlns:converters="clr-namespace:DoskaYkt_AutoManagement.Converters"
              mc:Ignorable="d" 
              d:DesignHeight="1000" 
              d:DesignWidth="800"
@@ -12,6 +13,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <ScrollViewer.Resources>
             <Style TargetType="ScrollBar" BasedOn="{StaticResource CustomScrollBar}"/>
+            <converters:BooleanNegationConverter x:Key="BooleanNegationConverter"/>
         </ScrollViewer.Resources>
         <StackPanel Margin="20,0,20,20" Orientation="Vertical">
             <Border Style="{StaticResource CardPanel}">
@@ -24,6 +26,7 @@
                                 VerticalAlignment="Center">
                         <Button Content="Сканирование объявлений" 
                                 Command="{Binding CheckAdsCommand}" 
+                                IsEnabled="{Binding IsScanning, Converter={StaticResource BooleanNegationConverter}}"
                                 Width="220" 
                                 Height="40" 
                                 Margin="5" 
@@ -172,6 +175,57 @@
                                    HorizontalAlignment="Center" 
                                    TextWrapping="Wrap"/>
                     </StackPanel>
+                </StackPanel>
+            </Border>
+            <Separator Margin="0,10,0,10"/>
+            <Border Style="{StaticResource CardPanel}">
+                <StackPanel>
+                    <TextBlock Text="Настройки планировщика"
+                               Foreground="White"
+                               FontSize="28"
+                               Margin="0,0,0,10"/>
+                    <Grid Margin="5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Шаг между объявлениями (сек):" Foreground="White" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding SchedulerStepSeconds, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Использовать задержку:" Foreground="White" VerticalAlignment="Center"/>
+                        <CheckBox Grid.Row="1" Grid.Column="1" IsChecked="{Binding SchedulerUseJitter, Mode=TwoWay}"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Задержка (мин-макс, сек):" Foreground="White" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SchedulerJitterMinSec, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBlock Grid.Row="2" Grid.Column="2" Text="-" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBox Grid.Row="2" Grid.Column="4" Text="{Binding SchedulerJitterMaxSec, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    </Grid>
+
+                    <Grid Margin="5,10,5,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="120"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="120"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Пауза между снятием и публикацией (сек):" Foreground="White" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding RepostDelayMinSec, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="-" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="4" Text="{Binding RepostDelayMaxSec, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                    </Grid>
                 </StackPanel>
             </Border>
         </StackPanel>

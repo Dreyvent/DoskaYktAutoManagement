@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Windows.Data;
+using System.Windows.Threading;
 
 namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 {
@@ -42,8 +43,10 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         public RelayCommand RestartTimersCommand { get; }
         public AsyncRelayCommand SyncWithSiteCommand { get; }
         public AsyncRelayCommand StartAllCommand { get; }
+        public RelayCommand StopAllCommand { get; }
         public AsyncRelayCommand CheckBrowserSessionCommand { get; }
         public AsyncRelayCommand StartBrowserSessionCommand { get; }
+        public RelayCommand<Ad> SyncAdStatusCommand { get; }
 
         private string _sessionStatusMessage;
         public string SessionStatusMessage
@@ -75,11 +78,24 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             set => SetProperty(ref _isOperationInProgress, value);
         }
 
+        // UI timer to refresh time-left labels while staying on the view
+        private readonly DispatcherTimer _uiTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        private int _nowTick;
+        public int NowTick
+        {
+            get => _nowTick;
+            private set => SetProperty(ref _nowTick, value);
+        }
+
         public MyADsViewModel()
         {
             MyAdsView = CollectionViewSource.GetDefaultView(MyAds);
-            SortBy = "Title";
-            SortAscending = true;
+            try
+            {
+                SortBy = string.IsNullOrWhiteSpace(Properties.Settings.Default.MyAdsSortBy) ? "Title" : Properties.Settings.Default.MyAdsSortBy;
+                SortAscending = Properties.Settings.Default.MyAdsSortAsc;
+            }
+            catch { SortBy = "Title"; SortAscending = true; }
             ApplySort();
             AdScheduler.Instance.AdRepostRequested += OnAdRepostRequested;
             DeleteAdCommand = new RelayCommand(DeleteAd, () => HasSelection);
@@ -189,12 +205,22 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             RestartTimersCommand = new RelayCommand(RestartTimers);
             SyncWithSiteCommand = new AsyncRelayCommand(SyncWithSiteAsync);
             StartAllCommand = new AsyncRelayCommand(StartAllAsync);
+            StopAllCommand = new RelayCommand(StopAll);
 
             CheckBrowserSessionCommand = new AsyncRelayCommand(CheckBrowserSessionAsync);
             StartBrowserSessionCommand = new AsyncRelayCommand(StartBrowserSessionAsync);
+            SyncAdStatusCommand = new RelayCommand<Ad>(ad => _ = SyncAdStatusAsync(ad));
 
             UnpublishMinutesInput = 30; // дефолт
             PublishMinutesInput = 10;   // дефолт
+
+            // Periodic UI tick for time-dependent labels
+            try
+            {
+                _uiTimer.Tick += (s, e) => { NowTick++; };
+                _uiTimer.Start();
+            }
+            catch { }
         }
 
         // ===== Sorting =====
@@ -202,12 +228,12 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         private string _sortBy;
         public string SortBy
         {
-            get => _sortBy; set { _sortBy = value; OnPropertyChanged(nameof(SortBy)); ApplySort(); }
+            get => _sortBy; set { _sortBy = value; OnPropertyChanged(nameof(SortBy)); ApplySort(); SaveSortPreferences(); }
         }
         private bool _sortAscending;
         public bool SortAscending
         {
-            get => _sortAscending; set { _sortAscending = value; OnPropertyChanged(nameof(SortAscending)); ApplySort(); }
+            get => _sortAscending; set { _sortAscending = value; OnPropertyChanged(nameof(SortAscending)); ApplySort(); SaveSortPreferences(); }
         }
 
         public void ApplySort()
@@ -227,6 +253,17 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             }
         }
 
+        private void SaveSortPreferences()
+        {
+            try
+            {
+                Properties.Settings.Default.MyAdsSortBy = SortBy;
+                Properties.Settings.Default.MyAdsSortAsc = SortAscending;
+                Properties.Settings.Default.Save();
+            }
+            catch { }
+        }
+
         private void ApplyUnpublishTimer()
         {
             if (UnpublishMinutesInput <= 0 || UnpublishMinutesInput > 1440) // Максимум 24 часа
@@ -239,7 +276,10 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             if (selected.Count == 0) return;
 
             // Распределяем старты: шаг в минутах + небольшой случайный джиттер
-            var stepMinutes = Math.Max(1, Math.Min(5, UnpublishMinutesInput / Math.Max(1, selected.Count)));
+            var stepSec = Math.Max(0, Properties.Settings.Default.SchedulerStepSeconds);
+            var useJitter = Properties.Settings.Default.SchedulerUseJitter;
+            var jitterMin = Math.Max(0, Properties.Settings.Default.SchedulerJitterMinSec);
+            var jitterMax = Math.Max(jitterMin, Properties.Settings.Default.SchedulerJitterMaxSec);
             var rnd = new Random();
 
             for (int i = 0; i < selected.Count; i++)
@@ -252,19 +292,17 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 // Настраиваем даты таймеров в зависимости от текущего состояния
                 if (ad.IsPublished)
                 {
-                    // Если опубликовано - ставим таймер на снятие
-                    var jitterSec = rnd.Next(5, 30);
-                    var offset = TimeSpan.FromMinutes(i * stepMinutes).Add(TimeSpan.FromSeconds(jitterSec));
-                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput).Add(offset);
+                    var baseOffset = TimeSpan.FromSeconds(i * stepSec);
+                    var jitter = useJitter ? TimeSpan.FromSeconds(rnd.Next(jitterMin, jitterMax + 1)) : TimeSpan.Zero;
+                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput).Add(baseOffset).Add(jitter);
                     ad.NextRepublishAt = null;
                     TerminalLogger.Instance.Log($"[Timers] Для '{ad.Title}' установлен таймер снятия через {UnpublishMinutesInput} мин.");
                 }
                 else
                 {
-                    // Если не опубликовано - ставим таймер на публикацию
-                    var jitterSec = rnd.Next(5, 30);
-                    var offset = TimeSpan.FromMinutes(i * stepMinutes).Add(TimeSpan.FromSeconds(jitterSec));
-                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput).Add(offset);
+                    var baseOffset = TimeSpan.FromSeconds(i * stepSec);
+                    var jitter = useJitter ? TimeSpan.FromSeconds(rnd.Next(jitterMin, jitterMax + 1)) : TimeSpan.Zero;
+                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput).Add(baseOffset).Add(jitter);
                     ad.NextUnpublishAt = null;
                     TerminalLogger.Instance.Log($"[Timers] Для '{ad.Title}' установлен таймер публикации через {PublishMinutesInput} мин.");
                 }
@@ -287,7 +325,10 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             var selected = GetSelectedAds();
             if (selected.Count == 0) return;
 
-            var stepMinutes = Math.Max(1, Math.Min(5, PublishMinutesInput / Math.Max(1, selected.Count)));
+            var stepSec = Math.Max(0, Properties.Settings.Default.SchedulerStepSeconds);
+            var useJitter = Properties.Settings.Default.SchedulerUseJitter;
+            var jitterMin = Math.Max(0, Properties.Settings.Default.SchedulerJitterMinSec);
+            var jitterMax = Math.Max(jitterMin, Properties.Settings.Default.SchedulerJitterMaxSec);
             var rnd = new Random();
 
             for (int i = 0; i < selected.Count; i++)
@@ -300,16 +341,16 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 // Настраиваем даты таймеров
                 if (ad.IsPublished)
                 {
-                    var jitterSec = rnd.Next(5, 30);
-                    var offset = TimeSpan.FromMinutes(i * stepMinutes).Add(TimeSpan.FromSeconds(jitterSec));
-                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput).Add(offset);
+                    var baseOffset = TimeSpan.FromSeconds(i * stepSec);
+                    var jitter = useJitter ? TimeSpan.FromSeconds(rnd.Next(jitterMin, jitterMax + 1)) : TimeSpan.Zero;
+                    ad.NextUnpublishAt = DateTime.Now.AddMinutes(UnpublishMinutesInput).Add(baseOffset).Add(jitter);
                     ad.NextRepublishAt = null;
                 }
                 else
                 {
-                    var jitterSec = rnd.Next(5, 30);
-                    var offset = TimeSpan.FromMinutes(i * stepMinutes).Add(TimeSpan.FromSeconds(jitterSec));
-                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput).Add(offset);
+                    var baseOffset = TimeSpan.FromSeconds(i * stepSec);
+                    var jitter = useJitter ? TimeSpan.FromSeconds(rnd.Next(jitterMin, jitterMax + 1)) : TimeSpan.Zero;
+                    ad.NextRepublishAt = DateTime.Now.AddMinutes(PublishMinutesInput).Add(baseOffset).Add(jitter);
                     ad.NextUnpublishAt = null;
                 }
 
@@ -338,6 +379,20 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         private void RestartTimers()
         {
             AdScheduler.Instance.RestartAllTimers();
+        }
+
+        private void StopAll()
+        {
+            try
+            {
+                var res = System.Windows.MessageBox.Show(
+                    "Остановить все таймеры?", "Подтверждение",
+                    System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning);
+                if (res != System.Windows.MessageBoxResult.Yes) return;
+            }
+            catch { }
+            AdScheduler.Instance.StopAll();
+            TerminalLogger.Instance.Log("[Scheduler] Все таймеры остановлены пользователем.");
         }
 
         private async Task SyncWithSiteAsync()
@@ -453,10 +508,15 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         /// <summary>Получить список выбранных объявлений (SelectedAd + чекбоксы)</summary>
         private System.Collections.Generic.List<Ad> GetSelectedAds()
         {
-            var selected = MyAds.Where(a => a.IsSelected).ToList();
-            if (SelectedAd != null && !selected.Contains(SelectedAd))
-                selected.Add(SelectedAd);
-            return selected;
+            // Order by current view order for deterministic queueing
+            var selectedSet = MyAds.Where(a => a.IsSelected).ToHashSet();
+            if (SelectedAd != null) selectedSet.Add(SelectedAd);
+            var ordered = new System.Collections.Generic.List<Ad>();
+            foreach (var item in MyAdsView)
+            {
+                if (item is Ad ad && selectedSet.Contains(ad)) ordered.Add(ad);
+            }
+            return ordered;
         }
 
         /// <summary>Обновить доступность всех команд</summary>

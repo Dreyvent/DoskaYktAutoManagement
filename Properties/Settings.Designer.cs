@@ -70,5 +70,101 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["HideDriverWindow"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Title")]
+        public string MyAdsSortBy {
+            get {
+                return ((string)(this["MyAdsSortBy"]));
+            }
+            set {
+                this["MyAdsSortBy"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool MyAdsSortAsc {
+            get {
+                return ((bool)(this["MyAdsSortAsc"]));
+            }
+            set {
+                this["MyAdsSortAsc"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("10")]
+        public int SchedulerStepSeconds {
+            get {
+                return ((int)(this["SchedulerStepSeconds"]));
+            }
+            set {
+                this["SchedulerStepSeconds"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool SchedulerUseJitter {
+            get {
+                return ((bool)(this["SchedulerUseJitter"]));
+            }
+            set {
+                this["SchedulerUseJitter"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("5")]
+        public int SchedulerJitterMinSec {
+            get {
+                return ((int)(this["SchedulerJitterMinSec"]));
+            }
+            set {
+                this["SchedulerJitterMinSec"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("30")]
+        public int SchedulerJitterMaxSec {
+            get {
+                return ((int)(this["SchedulerJitterMaxSec"]));
+            }
+            set {
+                this["SchedulerJitterMaxSec"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("3")]
+        public int RepostDelayMinSec {
+            get {
+                return ((int)(this["RepostDelayMinSec"]));
+            }
+            set {
+                this["RepostDelayMinSec"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("8")]
+        public int RepostDelayMaxSec {
+            get {
+                return ((int)(this["RepostDelayMaxSec"]));
+            }
+            set {
+                this["RepostDelayMaxSec"] = value;
+            }
+        }
     }
 }

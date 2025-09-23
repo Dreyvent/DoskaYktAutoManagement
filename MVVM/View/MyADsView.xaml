@@ -11,6 +11,9 @@
              UseLayoutRounding="True">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <conv:BooleanNegationConverter x:Key="BooleanNegationConverter"/>
+        <conv:TimeRemainingConverter x:Key="TimeRemainingConverter"/>
+        <conv:DateTimeDueConverter x:Key="DateTimeDueConverter"/>
     </UserControl.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <ScrollViewer.Resources>
@@ -23,6 +26,7 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
@@ -48,17 +52,52 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
-                                                <StackPanel Grid.Column="1" Orientation="Vertical" Margin="5,0,0,0">
+                                                <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
                                                     <TextBlock Text="{Binding Title}"/>
                                                     <StackPanel Orientation="Horizontal" Visibility="{Binding IsAutoRaiseEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
                                                         <TextBlock Text="Снять: " Foreground="Gray" FontSize="12"/>
-                                                        <TextBlock Text="{Binding NextUnpublishAt, StringFormat=HH:mm}" Foreground="Gray" FontSize="12" Margin="4,0,10,0"/>
+                                                        <TextBlock FontSize="12" Margin="4,0,10,0">
+                                                            <TextBlock.Text>
+                                                                <MultiBinding Converter="{StaticResource TimeRemainingConverter}">
+                                                                    <Binding Path="NextUnpublishAt"/>
+                                                                    <Binding Path="DataContext.NowTick" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                                                                </MultiBinding>
+                                                            </TextBlock.Text>
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="Gray"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding NextUnpublishAt, Converter={StaticResource DateTimeDueConverter}}" Value="True">
+                                                                            <Setter Property="Foreground" Value="Red"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
                                                         <TextBlock Text="Опубликовать: " Foreground="Gray" FontSize="12"/>
-                                                        <TextBlock Text="{Binding NextRepublishAt, StringFormat=HH:mm}" Foreground="Gray" FontSize="12"/>
+                                                        <TextBlock FontSize="12">
+                                                            <TextBlock.Text>
+                                                                <MultiBinding Converter="{StaticResource TimeRemainingConverter}">
+                                                                    <Binding Path="NextRepublishAt"/>
+                                                                    <Binding Path="DataContext.NowTick" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                                                                </MultiBinding>
+                                                            </TextBlock.Text>
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="Gray"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding NextRepublishAt, Converter={StaticResource DateTimeDueConverter}}" Value="True">
+                                                                            <Setter Property="Foreground" Value="Red"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
                                                     </StackPanel>
                                                     <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                                                         <TextBlock Text="Статус: " Foreground="Gray" FontSize="10"/>
@@ -93,9 +132,22 @@
                                                         </TextBlock>
                                                     </StackPanel>
                                                 </StackPanel>
-                                                <TextBlock Grid.Column="2" Text="{Binding SiteId}" Foreground="Gray" Margin="5,0,0,0"/>
-                                                <TextBlock Grid.Column="3" Text="{Binding AutoRaiseMinutes}" Foreground="Gray" Margin="10,0,0,0" Visibility="{Binding IsAutoRaiseEnabled, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                                        </Grid>
+                                                <TextBlock Grid.Column="3" Text="{Binding SiteId}" Foreground="Gray" Margin="5,0,0,0"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding Id}" Foreground="Gray" Margin="10,0,0,0"/>
+                                                <Button Grid.Column="4"
+                                                        Command="{Binding DataContext.SyncAdStatusCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Padding="4,2"
+                                                        Margin="10,0,0,0"
+                                                        VerticalAlignment="Center"
+                                                        Foreground="Black"
+                                                        Background="Transparent"
+                                                        BorderBrush="Transparent">
+                                                    <TextBlock Text="↻"
+                                                               FontFamily="Fonts/#Font Awesome 7 Free"
+                                                               FontSize="12"/>
+                                                </Button>
+                                            </Grid>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                                 </ListBox>
@@ -106,13 +158,15 @@
                                     Width="auto" 
                                     Padding="5"
                                     Command="{Binding DeleteAdCommand}" 
-                                    Margin="5" 
+                                    Margin="5"
+                                    IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
                                     ToolTip="Удалить локальные данные объявлений"/>
                             <Button Content="Автоподнять" 
                                     Width="auto"
                                     Padding="5"
                                     Command="{Binding BumpAdCommand}" 
-                                    Margin="5" 
+                                    Margin="5"
+                                    IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
                                     ToolTip="Снять и опубликовать выбранные объявление"/>
                             <Button Content="Снять объявления"
                                     Command="{Binding DeleteOnSiteCommand}"
@@ -120,6 +174,7 @@
                                     Padding="5"
                                     Height="36"
                                     Margin="5"
+                                    IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
                                     ToolTip="Снять выбранные объявления с сайта"/>
                             <Button Content="Опубликовать объявления"
                                     Command="{Binding ActivateAdOnSiteCommand}"
@@ -127,13 +182,17 @@
                                     Padding="5"
                                     Height="36"
                                     Margin="5"
+                                    IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
                                     ToolTip="Опубликовать выбранные объявления с сайта"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Grid.Row="2" HorizontalAlignment="Center">
                             <Button Content="Синхронизировать"
                                     Command="{Binding SyncWithSiteCommand}"
                                     Width="auto"
                                     Padding="5"
                                     Height="36"
                                     Margin="5"
+                                    IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
                                     ToolTip="Синхронизировать статус объявлений с сайтом"/>
                             <Button Content="Запустить всё"
                                     Command="{Binding StartAllCommand}"
@@ -144,8 +203,17 @@
                                     Background="#4CAF50"
                                     Foreground="White"
                                     ToolTip="Запустить все активные таймеры"/>
+                            <Button Content="Остановить все"
+                                    Command="{Binding StopAllCommand}"
+                                    Width="auto"
+                                    Padding="5"
+                                    Height="36"
+                                    Margin="5"
+                                    Background="#F44336"
+                                    Foreground="White"
+                                    ToolTip="Остановить все таймеры"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Grid.Row="2" HorizontalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Grid.Row="3" HorizontalAlignment="Center">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition/>
@@ -162,7 +230,7 @@
                                 </Grid.RowDefinitions>
 
                                 <!-- Таймер снятия -->
-                                <TextBlock Text="Цикл снятия с публикации:"
+                                <TextBlock Text="Таймер снятия с публикации:"
                                            Grid.Column="0"
                                            Grid.Row="0"
                                            FontSize="18"
@@ -202,7 +270,7 @@
                                            VerticalAlignment="Center"/>
 
                                 <!-- Таймер публикации -->
-                                <TextBlock Text="Цикл публикации:"
+                                <TextBlock Text="Таймер публикации:"
                                            Grid.Column="0"
                                            Grid.Row="2"
                                            FontSize="18"

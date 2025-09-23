@@ -13,14 +13,12 @@ namespace DoskaYkt_AutoManagement.Core
         private static readonly Lazy<TaskQueue> _instance = new(() => new TaskQueue());
         public static TaskQueue Instance => _instance.Value;
 
-        private readonly SemaphoreSlim _singleWorkerSemaphore;
         private readonly ConcurrentQueue<(Func<Task> work, string? description)> _queue = new();
         private readonly ConcurrentDictionary<string, byte> _keysInFlight = new();
         private int _isWorkerRunning = 0;
 
         private TaskQueue()
         {
-            _singleWorkerSemaphore = new SemaphoreSlim(1, 1);
         }
 
         public Task Enqueue(Func<Task> work, string? description = null)

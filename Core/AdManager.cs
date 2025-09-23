@@ -66,8 +66,8 @@ namespace DoskaYkt_AutoManagement.Core
                     SiteId = siteId,
                     IsPublished = isPublishedOnSite, // Синхронизируем с состоянием на сайте
                     IsPublishedOnSite = isPublishedOnSite,
-                    NextUnpublishAt = string.IsNullOrEmpty(nextUnpublishAt) ? null : DateTime.TryParse(nextUnpublishAt, out var unpublishDate) ? unpublishDate : null,
-                    NextRepublishAt = string.IsNullOrEmpty(nextRepublishAt) ? null : DateTime.TryParse(nextRepublishAt, out var republishDate) ? republishDate : null
+                    NextUnpublishAt = string.IsNullOrEmpty(nextUnpublishAt) ? (DateTime?)null : (DateTime.TryParseExact(nextUnpublishAt, "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var unpublishDate) ? unpublishDate : (DateTime.TryParse(nextUnpublishAt, out var unpubFallback) ? unpubFallback : (DateTime?)null)),
+                    NextRepublishAt = string.IsNullOrEmpty(nextRepublishAt) ? (DateTime?)null : (DateTime.TryParseExact(nextRepublishAt, "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var republishDate) ? republishDate : (DateTime.TryParse(nextRepublishAt, out var repubFallback) ? repubFallback : (DateTime?)null))
                 };
                 Ads.Add(ad);
                 
