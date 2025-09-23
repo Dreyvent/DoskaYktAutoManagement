@@ -10,14 +10,14 @@
 		<StartupObject>DoskaYkt_AutoManagement.App</StartupObject>
 		<ApplicationIcon>Images\DoskaYkt-Favicon.ico</ApplicationIcon>
 		<Description>Автоматическое создание и удаление объявлений в сайте DoskaYkt</Description>
-		<FileVersion>0.6.7</FileVersion>
+		<FileVersion>0.7.0</FileVersion>
 		<NeutralLanguage>ru</NeutralLanguage>
 		<Title>DoskaYkt ADAutoManagement</Title>
 		<Company>Arch Kitsune Studio</Company>
 		<Copyright>(c) 2025 Arch Kitsune Studio/Andrey Dedyukin. All rights reserved.</Copyright>
 		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
 		<EnableDefaultPageItems>false</EnableDefaultPageItems>
-		<Version>0.6.7</Version>
+		<Version>0.7.0</Version>
 		<PlatformTarget>AnyCPU</PlatformTarget>
 		<AssemblyTitle>DoskaYkt AutoManagement</AssemblyTitle>
 		<AssemblyDescription>Автоматическое управление объявлениями на DoskaYkt</AssemblyDescription>
@@ -59,14 +59,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="DotNetSeleniumExtras.WaitHelpers" Version="3.11.0" />
 		<PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
 		<PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.9" />
 		<PackageReference Include="Microsoft.Data.Sqlite.Core" Version="9.0.9" />
-		<PackageReference Include="Selenium.Firefox.WebDriver" Version="0.27.0" />
-		<PackageReference Include="Selenium.Support" Version="4.35.0" />
-		<PackageReference Include="Selenium.WebDriver" Version="4.35.0" />
-		<PackageReference Include="Selenium.WebDriver.ChromeDriver" Version="140.0.7339.18500" />
+		<PackageReference Include="Microsoft.Playwright" Version="1.55.0" />
 		<PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.2" />
 		<PackageReference Include="SQLitePCLRaw.core" Version="3.0.2" />
 	</ItemGroup>

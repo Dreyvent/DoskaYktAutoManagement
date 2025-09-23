@@ -166,5 +166,17 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["RepostDelayMaxSec"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool UsePlaywright {
+            get {
+                return ((bool)(this["UsePlaywright"]));
+            }
+            set {
+                this["UsePlaywright"] = value;
+            }
+        }
     }
 }

@@ -60,44 +60,51 @@
                                                 <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
                                                     <TextBlock Text="{Binding Title}"/>
                                                     <StackPanel Orientation="Horizontal" Visibility="{Binding IsAutoRaiseEnabled, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                                        <TextBlock Text="Снять: " Foreground="Gray" FontSize="12"/>
-                                                        <TextBlock FontSize="12" Margin="4,0,10,0">
-                                                            <TextBlock.Text>
-                                                                <MultiBinding Converter="{StaticResource TimeRemainingConverter}">
-                                                                    <Binding Path="NextUnpublishAt"/>
-                                                                    <Binding Path="DataContext.NowTick" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
-                                                                </MultiBinding>
-                                                            </TextBlock.Text>
-                                                            <TextBlock.Style>
-                                                                <Style TargetType="TextBlock">
-                                                                    <Setter Property="Foreground" Value="Gray"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding NextUnpublishAt, Converter={StaticResource DateTimeDueConverter}}" Value="True">
-                                                                            <Setter Property="Foreground" Value="Red"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </TextBlock.Style>
-                                                        </TextBlock>
-                                                        <TextBlock Text="Опубликовать: " Foreground="Gray" FontSize="12"/>
-                                                        <TextBlock FontSize="12">
-                                                            <TextBlock.Text>
-                                                                <MultiBinding Converter="{StaticResource TimeRemainingConverter}">
-                                                                    <Binding Path="NextRepublishAt"/>
-                                                                    <Binding Path="DataContext.NowTick" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
-                                                                </MultiBinding>
-                                                            </TextBlock.Text>
-                                                            <TextBlock.Style>
-                                                                <Style TargetType="TextBlock">
-                                                                    <Setter Property="Foreground" Value="Gray"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding NextRepublishAt, Converter={StaticResource DateTimeDueConverter}}" Value="True">
-                                                                            <Setter Property="Foreground" Value="Red"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </TextBlock.Style>
-                                                        </TextBlock>
+                                                        <!-- Показать таймер снятия только когда объявление опубликовано -->
+                                                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsPublished, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                            <TextBlock Text="Снять: " Foreground="Gray" FontSize="12"/>
+                                                            <TextBlock FontSize="12" Margin="4,0,10,0">
+                                                                <TextBlock.Text>
+                                                                    <MultiBinding Converter="{StaticResource TimeRemainingConverter}">
+                                                                        <Binding Path="NextUnpublishAt"/>
+                                                                        <Binding Path="DataContext.NowTick" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                                                                    </MultiBinding>
+                                                                </TextBlock.Text>
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="Gray"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding NextUnpublishAt, Converter={StaticResource DateTimeDueConverter}}" Value="True">
+                                                                                <Setter Property="Foreground" Value="Red"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </StackPanel>
+
+                                                        <!-- Показать таймер публикации только когда объявление снято -->
+                                                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsPublished, Converter={StaticResource BooleanNegationConverter}}">
+                                                            <TextBlock Text="Опубликовать: " Foreground="Gray" FontSize="12"/>
+                                                            <TextBlock FontSize="12">
+                                                                <TextBlock.Text>
+                                                                    <MultiBinding Converter="{StaticResource TimeRemainingConverter}">
+                                                                        <Binding Path="NextRepublishAt"/>
+                                                                        <Binding Path="DataContext.NowTick" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                                                                    </MultiBinding>
+                                                                </TextBlock.Text>
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="Gray"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding NextRepublishAt, Converter={StaticResource DateTimeDueConverter}}" Value="True">
+                                                                                <Setter Property="Foreground" Value="Red"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </StackPanel>
                                                     </StackPanel>
                                                     <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
                                                         <TextBlock Text="Статус: " Foreground="Gray" FontSize="10"/>
@@ -236,24 +243,6 @@
                                            FontSize="18"
                                            Foreground="White"
                                            VerticalAlignment="Center"/>
-                                <Button Content="Применить таймер"
-                                        Grid.Column="2"
-                                        Grid.Row="0"
-                                        Padding="5"
-                                        Command="{Binding ApplyUnpublishTimerCommand}" 
-                                        Margin="5" />
-                                <Button Content="Убрать таймеры"
-                                        Grid.Column="3"
-                                        Grid.Row="1"
-                                        Padding="5"
-                                        Command="{Binding RemoveTimersCommand}" 
-                                        Margin="5" />
-                                <Button Content="Перезапустить таймеры"
-                                        Grid.Column="2"
-                                        Grid.Row="1"
-                                        Padding="5"
-                                        Command="{Binding RestartTimersCommand}" 
-                                        Margin="5" />
                                 <TextBox Text="{Binding UnpublishMinutesInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          Grid.Column="3"
                                          Grid.Row="0"
@@ -272,30 +261,52 @@
                                 <!-- Таймер публикации -->
                                 <TextBlock Text="Таймер публикации:"
                                            Grid.Column="0"
-                                           Grid.Row="2"
+                                           Grid.Row="1"
                                            FontSize="18"
                                            Foreground="White"
                                            VerticalAlignment="Center"/>
-                                <Button Content="Применить таймер"
-                                        Grid.Column="2"
-                                        Grid.Row="2"
-                                        Padding="5"
-                                        Command="{Binding ApplyPublishTimerCommand}" 
-                                        Margin="5" />
                                 <TextBox Text="{Binding PublishMinutesInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                          DataObject.Pasting="NumberOnly_Pasting"
                                          PreviewTextInput="NumberOnly_PreviewTextInput"
                                          Grid.Column="3"
-                                         Grid.Row="2"
+                                         Grid.Row="1"
                                          FontSize="18"
                                          VerticalContentAlignment="Center"
                                          Height="30"/>
                                 <TextBlock Text="минут"
                                            Grid.Column="4"
-                                           Grid.Row="2"
+                                           Grid.Row="1"
                                            Foreground="White"
                                            FontSize="12"
                                            VerticalAlignment="Center"/>
+                                <Grid Grid.Row="2" Grid.ColumnSpan="5" HorizontalAlignment="Center">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="auto"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="auto"/>
+                                        <ColumnDefinition Width="auto"/>
+                                        <ColumnDefinition Width="auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Button Content="Применить таймеры"
+                                            Grid.Column="0"
+                                            Grid.Row="0"
+                                            Padding="5"
+                                            Command="{Binding ApplyTimersCommand}" 
+                                            Margin="5" />
+                                    <Button Content="Убрать таймеры"
+                                            Grid.Column="2"
+                                            Grid.Row="0"
+                                            Padding="5"
+                                            Command="{Binding RemoveTimersCommand}" 
+                                            Margin="5" />
+                                    <Button Content="Перезапустить таймеры"
+                                            Grid.Column="1"
+                                            Grid.Row="0"
+                                            Padding="5"
+                                            Command="{Binding RestartTimersCommand}" 
+                                            Margin="5" />
+                                </Grid>
                                 <Grid Grid.Row="3"
                                       Grid.ColumnSpan="5"
                                       HorizontalAlignment="Center">
