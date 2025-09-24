@@ -15,7 +15,7 @@ namespace DoskaYkt_AutoManagement.Core
         private static readonly string _dbPath =
             (Environment.GetEnvironmentVariable("ADS_DB_PATH") ??
              Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
-                         "DoskaYktAutoManagement", "ads.db"));
+                         "DoskaYktAutoManagement", "DSKAMDataBase"));
 
         private static readonly string _connectionString =
             $"Data Source={_dbPath};Cache=Shared;Default Timeout=30";
@@ -55,6 +55,7 @@ namespace DoskaYkt_AutoManagement.Core
                     AccountId INTEGER NOT NULL,
                     AccountLogin TEXT NOT NULL,
                     SiteId TEXT NOT NULL DEFAULT '',
+                    [Group] TEXT NOT NULL DEFAULT '',
                     IsPublishedOnSite INTEGER NOT NULL DEFAULT 0,
                     NextUnpublishAt TEXT NULL,
                     NextRepublishAt TEXT NULL,
@@ -87,6 +88,7 @@ namespace DoskaYkt_AutoManagement.Core
             command.CommandText = "PRAGMA table_info(Announcements);";
             using var reader2 = command.ExecuteReader();
             bool hasSiteId = false;
+            bool hasGroup = false;
             bool hasIsPublishedOnSite = false;
             bool hasNextUnpublishAt = false;
             bool hasNextRepublishAt = false;
@@ -95,6 +97,8 @@ namespace DoskaYkt_AutoManagement.Core
                 var columnName = reader2.GetString(1);
                 if (columnName.Equals("SiteId", StringComparison.OrdinalIgnoreCase))
                     hasSiteId = true;
+                else if (columnName.Equals("Group", StringComparison.OrdinalIgnoreCase) || columnName.Equals("[Group]", StringComparison.OrdinalIgnoreCase))
+                    hasGroup = true;
                 else if (columnName.Equals("IsPublishedOnSite", StringComparison.OrdinalIgnoreCase))
                     hasIsPublishedOnSite = true;
                 else if (columnName.Equals("NextUnpublishAt", StringComparison.OrdinalIgnoreCase))
@@ -107,6 +111,11 @@ namespace DoskaYkt_AutoManagement.Core
             if (!hasSiteId)
             {
                 command.CommandText = "ALTER TABLE Announcements ADD COLUMN SiteId TEXT NOT NULL DEFAULT '';";
+                try { command.ExecuteNonQuery(); } catch { }
+            }
+            if (!hasGroup)
+            {
+                command.CommandText = "ALTER TABLE Announcements ADD COLUMN [Group] TEXT NOT NULL DEFAULT '';";
                 try { command.ExecuteNonQuery(); } catch { }
             }
             if (!hasIsPublishedOnSite)
@@ -239,15 +248,15 @@ namespace DoskaYkt_AutoManagement.Core
         // ==================
         // Announcements
         // ==================
-        public static async Task<List<(int id, string title, int cycle, int isAuto, int accountId, string accountLogin, string siteId, bool isPublishedOnSite, string nextUnpublishAt, string nextRepublishAt)>> GetAnnouncementsAsync()
+        public static async Task<List<(int id, string title, int cycle, int isAuto, int accountId, string accountLogin, string siteId, string group, bool isPublishedOnSite, string nextUnpublishAt, string nextRepublishAt)>> GetAnnouncementsAsync()
         {
-            var result = new List<(int, string, int, int, int, string, string, bool, string, string)>();
+            var result = new List<(int, string, int, int, int, string, string, string, bool, string, string)>();
 
             using var connection = new SqliteConnection(_connectionString);
             await connection.OpenAsync().ConfigureAwait(false);
 
             var command = connection.CreateCommand();
-            command.CommandText = "SELECT Id, Title, Cycle, IsAuto, AccountId, AccountLogin, SiteId, IsPublishedOnSite, NextUnpublishAt, NextRepublishAt FROM Announcements;";
+            command.CommandText = "SELECT Id, Title, Cycle, IsAuto, AccountId, AccountLogin, SiteId, [Group], IsPublishedOnSite, NextUnpublishAt, NextRepublishAt FROM Announcements;";
 
             using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
             while (await reader.ReadAsync().ConfigureAwait(false))
@@ -260,9 +269,10 @@ namespace DoskaYkt_AutoManagement.Core
                     reader.GetInt32(4),
                     reader.GetString(5),
                     reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
-                    reader.GetInt32(7) == 1,
-                    reader.IsDBNull(8) ? string.Empty : reader.GetString(8),
-                    reader.IsDBNull(9) ? string.Empty : reader.GetString(9)
+                    reader.IsDBNull(7) ? string.Empty : reader.GetString(7),
+                    reader.GetInt32(8) == 1,
+                    reader.IsDBNull(9) ? string.Empty : reader.GetString(9),
+                    reader.IsDBNull(10) ? string.Empty : reader.GetString(10)
                 ));
             }
 
@@ -276,6 +286,7 @@ namespace DoskaYkt_AutoManagement.Core
             int accountId,
             string accountLogin,
             string siteId = "",
+            string group = "",
             bool isPublishedOnSite = false,
             string? nextUnpublishAt = null,
             string? nextRepublishAt = null)
@@ -286,8 +297,8 @@ namespace DoskaYkt_AutoManagement.Core
             var command = connection.CreateCommand();
             command.CommandText = @"
                 INSERT INTO Announcements 
-                (Title, Cycle, IsAuto, AccountId, AccountLogin, SiteId, IsPublishedOnSite, NextUnpublishAt, NextRepublishAt)
-                VALUES ($title, $cycle, $isAuto, $accountId, $accountLogin, $siteId, $isPublishedOnSite, $nextUnpublishAt, $nextRepublishAt);
+                (Title, Cycle, IsAuto, AccountId, AccountLogin, SiteId, [Group], IsPublishedOnSite, NextUnpublishAt, NextRepublishAt)
+                VALUES ($title, $cycle, $isAuto, $accountId, $accountLogin, $siteId, $group, $isPublishedOnSite, $nextUnpublishAt, $nextRepublishAt);
                 SELECT last_insert_rowid();";
             command.Parameters.AddWithValue("$title", title);
             command.Parameters.AddWithValue("$cycle", cycle);
@@ -295,6 +306,7 @@ namespace DoskaYkt_AutoManagement.Core
             command.Parameters.AddWithValue("$accountId", accountId);
             command.Parameters.AddWithValue("$accountLogin", accountLogin);
             command.Parameters.AddWithValue("$siteId", siteId);
+            command.Parameters.AddWithValue("$group", group ?? "");
             command.Parameters.AddWithValue("$isPublishedOnSite", isPublishedOnSite ? 1 : 0);
             command.Parameters.AddWithValue("$nextUnpublishAt", (object?)nextUnpublishAt ?? DBNull.Value);
             command.Parameters.AddWithValue("$nextRepublishAt", (object?)nextRepublishAt ?? DBNull.Value);
@@ -311,6 +323,7 @@ namespace DoskaYkt_AutoManagement.Core
             int accountId,
             string accountLogin,
             string siteId = "",
+            string group = "",
             bool isPublishedOnSite = false,
             string? nextUnpublishAt = null,
             string? nextRepublishAt = null)
@@ -327,6 +340,7 @@ namespace DoskaYkt_AutoManagement.Core
                     AccountId = $accountId,
                     AccountLogin = $accountLogin,
                     SiteId = $siteId,
+                    [Group] = $group,
                     IsPublishedOnSite = $isPublishedOnSite,
                     NextUnpublishAt = $nextUnpublishAt,
                     NextRepublishAt = $nextRepublishAt
@@ -337,6 +351,7 @@ namespace DoskaYkt_AutoManagement.Core
             command.Parameters.AddWithValue("$accountId", accountId);
             command.Parameters.AddWithValue("$accountLogin", accountLogin);
             command.Parameters.AddWithValue("$siteId", siteId);
+            command.Parameters.AddWithValue("$group", group ?? "");
             command.Parameters.AddWithValue("$isPublishedOnSite", isPublishedOnSite ? 1 : 0);
             command.Parameters.AddWithValue("$nextUnpublishAt", (object?)nextUnpublishAt ?? DBNull.Value);
             command.Parameters.AddWithValue("$nextRepublishAt", (object?)nextRepublishAt ?? DBNull.Value);

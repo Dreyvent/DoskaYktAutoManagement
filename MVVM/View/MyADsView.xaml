@@ -40,11 +40,26 @@
                                     </Grid.RowDefinitions>
                                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5" HorizontalAlignment="Left">
                                         <TextBlock Text="Фильтр:" Foreground="White" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                        <ComboBox SelectedIndex="0" Width="140" SelectedValue="{Binding FilterMode}" SelectedValuePath="Content">
-                                            <ComboBoxItem Content="Все"/>
-                                            <ComboBoxItem Content="Опубликованные"/>
-                                            <ComboBoxItem Content="Снятые"/>
+                                        <ComboBox SelectedIndex="0" Width="100" SelectedValue="{Binding FilterMode}" SelectedValuePath="Content">
+                                            <ComboBoxItem Content="Все" TabIndex="0"/>
+                                            <ComboBoxItem Content="Опубликованные" TabIndex="1"/>
+                                            <ComboBoxItem Content="Снятые" TabIndex="2"/>
+                                            <ComboBoxItem Content="Выбранные" TabIndex="3"/>
+                                            <ComboBoxItem Content="С таймером" TabIndex="4"/>
                                         </ComboBox>
+                                        <TextBlock Text="Группы:"
+                                                   Foreground="White"
+                                                   Margin="5,0,5,0"
+                                                   VerticalAlignment="Center"/>
+                                        <ComboBox Width="120" Margin="0,0,10,0"
+                                                  ItemsSource="{Binding Groups}"
+                                                  SelectedItem="{Binding GroupFilter, Mode=TwoWay}"/>
+                                        <Button Content="Создать группу"
+                                                Command="{Binding CreateGroupCommand}"
+                                                Margin="0,0,5,0"/>
+                                        <Button Content="Удалить группу"
+                                                Command="{Binding DeleteGroupCommand}"
+                                                Margin="0,0,0,0"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="5" HorizontalAlignment="Right">
                                         <Button Content="Выбрать все" Command="{Binding SelectAllCommand}" Margin="0,0,5,0"/>
@@ -177,67 +192,75 @@
                                 </Grid>
                             </StackPanel>
                         </Border>
-                        <StackPanel Orientation="Horizontal" Grid.Row="1" HorizontalAlignment="Center">
-                            <Button Content="Удалить выбранные"
-                                    Width="auto" 
-                                    Padding="5"
-                                    Command="{Binding DeleteAdCommand}" 
-                                    Margin="5"
-                                    IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
-                                    ToolTip="Удалить локальные данные объявлений"/>
-                            <Button Content="Автоподнять" 
-                                    Width="auto"
-                                    Padding="5"
-                                    Command="{Binding BumpAdCommand}" 
-                                    Margin="5"
-                                    IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
-                                    ToolTip="Снять и опубликовать выбранные объявление"/>
-                            <Button Content="Снять объявления"
-                                    Command="{Binding DeleteOnSiteCommand}"
-                                    Width="auto"
-                                    Padding="5"
-                                    Height="36"
-                                    Margin="5"
-                                    IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
-                                    ToolTip="Снять выбранные объявления с сайта"/>
-                            <Button Content="Опубликовать объявления"
-                                    Command="{Binding ActivateAdOnSiteCommand}"
-                                    Width="auto"
-                                    Padding="5"
-                                    Height="36"
-                                    Margin="5"
-                                    IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
-                                    ToolTip="Опубликовать выбранные объявления с сайта"/>
-                        </StackPanel>
                         <StackPanel Orientation="Horizontal" Grid.Row="2" HorizontalAlignment="Center">
-                            <Button Content="Синхронизировать"
-                                    Command="{Binding SyncWithSiteCommand}"
-                                    Width="auto"
-                                    Padding="5"
-                                    Height="36"
-                                    Margin="5"
-                                    IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
-                                    ToolTip="Синхронизировать статус объявлений с сайтом"/>
-                            <Button Content="Запустить всё"
-                                    Command="{Binding StartAllCommand}"
-                                    Width="auto"
-                                    Padding="5"
-                                    Height="36"
-                                    Margin="5"
-                                    Background="#4CAF50"
-                                    Foreground="White"
-                                    ToolTip="Запустить все активные таймеры"/>
-                            <Button Content="Остановить все"
-                                    Command="{Binding StopAllCommand}"
-                                    Width="auto"
-                                    Padding="5"
-                                    Height="36"
-                                    Margin="5"
-                                    Background="#F44336"
-                                    Foreground="White"
-                                    ToolTip="Остановить все таймеры"/>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="auto"/>
+                                    <RowDefinition/>
+                                </Grid.RowDefinitions>
+                                <StackPanel Orientation="Horizontal" Grid.Row="0" HorizontalAlignment="Center">
+                                    <Button Content="Удалить выбранные"
+                                            Width="auto" 
+                                            Padding="5"
+                                            Command="{Binding DeleteAdCommand}" 
+                                            Margin="5"
+                                            IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
+                                            ToolTip="Удалить локальные данные объявлений"/>
+                                    <Button Content="Автоподнять" 
+                                            Width="auto"
+                                            Padding="5"
+                                            Command="{Binding BumpAdCommand}" 
+                                            Margin="5"
+                                            IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
+                                            ToolTip="Снять и опубликовать выбранные объявление"/>
+                                    <Button Content="Снять объявления"
+                                            Command="{Binding DeleteOnSiteCommand}"
+                                            Width="auto"
+                                            Padding="5"
+                                            Height="36"
+                                            Margin="5"
+                                            IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
+                                            ToolTip="Снять выбранные объявления с сайта"/>
+                                    <Button Content="Опубликовать объявления"
+                                            Command="{Binding ActivateAdOnSiteCommand}"
+                                            Width="auto"
+                                            Padding="5"
+                                            Height="36"
+                                            Margin="5"
+                                            IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
+                                            ToolTip="Опубликовать выбранные объявления с сайта"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Grid.Row="1" HorizontalAlignment="Center">
+                                    <Button Content="Синхронизировать"
+                                            Command="{Binding SyncWithSiteCommand}"
+                                            Width="auto"
+                                            Padding="5"
+                                            Height="36"
+                                            Margin="5"
+                                            IsEnabled="{Binding IsOperationInProgress, Converter={StaticResource BooleanNegationConverter}}"
+                                            ToolTip="Синхронизировать статус объявлений с сайтом"/>
+                                    <Button Content="Запустить всё"
+                                            Command="{Binding StartAllCommand}"
+                                            Width="auto"
+                                            Padding="5"
+                                            Height="36"
+                                            Margin="5"
+                                            Background="#4CAF50"
+                                            Foreground="White"
+                                            ToolTip="Запустить все активные таймеры"/>
+                                    <Button Content="Остановить все"
+                                            Command="{Binding StopAllCommand}"
+                                            Width="auto"
+                                            Padding="5"
+                                            Height="36"
+                                            Margin="5"
+                                            Background="#F44336"
+                                            Foreground="White"
+                                            ToolTip="Остановить все таймеры"/>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Grid.Row="3" HorizontalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Grid.Row="1" HorizontalAlignment="Center">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition/>
@@ -333,57 +356,56 @@
                                               Foreground="White"
                                               ToolTip="Останавливает все таймеры ночью"/>
                                 </Grid>
-                                <Grid Grid.Row="3"
-                                      Grid.ColumnSpan="5"
-                                      HorizontalAlignment="Center">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="(Перед работой таймеров, проверьте работает ли сессия браузера.)"
-                                               Foreground="Gray"
-                                               Grid.ColumnSpan="4"
-                                               Grid.Row="0"
-                                               HorizontalAlignment="Center"/>
-                                    <Button Content="Проверить сессию браузера"
-                                            Command="{Binding CheckBrowserSessionCommand}"
-                                            Width="auto"
-                                            Padding="5"
-                                            Height="36"
-                                            Margin="5"
-                                            Grid.Row="2"
-                                            Grid.ColumnSpan="2"
-                                            HorizontalAlignment="Center"
-                                            ToolTip="Проверить работает ли текущая сессия браузера с драйвером"/>
-                                    <TextBlock Text="{Binding SessionStatusMessage}"
-                                               FontSize="14"
-                                               Margin="5"
-                                               Foreground="White"
-                                               Grid.Row="3"
-                                               Grid.ColumnSpan="2"
-                                               HorizontalAlignment="Center"
-                                               TextWrapping="Wrap"/>
-                                    <Button Content="Запуск сеанса"
-                                            Command="{Binding StartBrowserSessionCommand}"
-                                            Width="auto"
-                                            Padding="5"
-                                            Height="36"
-                                            Margin="5"
-                                            Grid.Row="1"
-                                            Grid.ColumnSpan="2"
-                                            HorizontalAlignment="Center"
-                                            ToolTip="Запустить новый сеанс браузера с драйвером"/>
-
-                                </Grid>
                             </Grid>
                         </StackPanel>
+                        <Grid Grid.Row="3"
+                              Grid.ColumnSpan="5"
+                              HorizontalAlignment="Center">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="(Перед работой таймеров, проверьте работает ли сессия браузера.)"
+                                       Foreground="Gray"
+                                       Grid.ColumnSpan="4"
+                                       Grid.Row="0"
+                                       HorizontalAlignment="Center"/>
+                            <Button Content="Проверить сессию браузера"
+                                    Command="{Binding CheckBrowserSessionCommand}"
+                                    Width="auto"
+                                    Padding="5"
+                                    Height="36"
+                                    Margin="5"
+                                    Grid.Row="2"
+                                    Grid.ColumnSpan="2"
+                                    HorizontalAlignment="Center"
+                                    ToolTip="Проверить работает ли текущая сессия браузера с драйвером"/>
+                            <TextBlock Text="{Binding SessionStatusMessage}"
+                                       FontSize="14"
+                                       Margin="5"
+                                       Foreground="White"
+                                       Grid.Row="3"
+                                       Grid.ColumnSpan="2"
+                                       HorizontalAlignment="Center"
+                                       TextWrapping="Wrap"/>
+                            <Button Content="Запуск сеанса"
+                                    Command="{Binding StartBrowserSessionCommand}"
+                                    Width="auto"
+                                    Padding="5"
+                                    Height="36"
+                                    Margin="5"
+                                    Grid.Row="1"
+                                    Grid.ColumnSpan="2"
+                                    HorizontalAlignment="Center"
+                                    ToolTip="Запустить новый сеанс браузера с драйвером"/>
+                        </Grid>
                     </Grid>
                 </StackPanel>
             </Border>

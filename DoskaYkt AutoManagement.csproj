@@ -10,14 +10,14 @@
 		<StartupObject>DoskaYkt_AutoManagement.App</StartupObject>
 		<ApplicationIcon>Images\DoskaYkt-Favicon.ico</ApplicationIcon>
 		<Description>Автоматическое создание и удаление объявлений в сайте DoskaYkt</Description>
-		<FileVersion>0.7.2</FileVersion>
+		<FileVersion>0.7.5</FileVersion>
 		<NeutralLanguage>ru</NeutralLanguage>
 		<Title>DoskaYkt ADAutoManagement</Title>
 		<Company>Arch Kitsune Studio</Company>
 		<Copyright>(c) 2025 Arch Kitsune Studio/Andrey Dedyukin. All rights reserved.</Copyright>
 		<EnableDefaultCompileItems>false</EnableDefaultCompileItems>
 		<EnableDefaultPageItems>false</EnableDefaultPageItems>
-		<Version>0.7.2</Version>
+		<Version>0.7.5</Version>
 		<PlatformTarget>AnyCPU</PlatformTarget>
 		<AssemblyTitle>DoskaYkt AutoManagement</AssemblyTitle>
 		<AssemblyDescription>Автоматическое управление объявлениями на DoskaYkt</AssemblyDescription>
@@ -25,8 +25,8 @@
 		<AssemblyProduct>DoskaYkt AutoManagement</AssemblyProduct>
 		<AssemblyCopyright>Copyright © 2025 Arch Kitsune Studio</AssemblyCopyright>
 		<AssemblyVersion></AssemblyVersion>
-		<AssemblyFileVersion>0.6.0.0</AssemblyFileVersion>
-		<AssemblyInformationalVersion>0.6.0-beta</AssemblyInformationalVersion>
+		<AssemblyFileVersion>0.7.5.0</AssemblyFileVersion>
+		<AssemblyInformationalVersion>0.7.5-beta</AssemblyInformationalVersion>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)'=='Release'">
@@ -53,6 +53,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <Content Include="Images\DoskaYkt-Favicon.ico" />
 	  <Content Include="Images\DoskaYkt-Favicon3.ico">
 	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	  </Content>

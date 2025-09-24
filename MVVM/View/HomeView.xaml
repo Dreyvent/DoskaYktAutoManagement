@@ -188,6 +188,19 @@
                         <TextBlock Grid.Row="0" Grid.Column="2" Text="-" Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         <TextBox Grid.Row="0" Grid.Column="4" Text="{Binding RepostDelayMaxSec, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                     </Grid>
+                    <Grid Margin="5,10,5,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="auto"/>
+                            <ColumnDefinition Width="80"/>
+                            <ColumnDefinition Width="auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Параллельных задач (1-3):" Foreground="White" VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding TaskQueueMaxConcurrency, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBlock Text="(Ускоряет работу с сайтом несколькими вкладками)" Margin="10,0,0,0" Grid.Row="0" Grid.Column="2" Foreground="Gray" VerticalAlignment="Center"/>
+                    </Grid>
                 </StackPanel>
             </Border>
         </StackPanel>

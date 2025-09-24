@@ -130,5 +130,29 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["SleepAtNight"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        public int TaskQueueMaxConcurrency {
+            get {
+                return ((int)(this["TaskQueueMaxConcurrency"]));
+            }
+            set {
+                this["TaskQueueMaxConcurrency"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Группа 1")]
+        public string MyAdsGroups {
+            get {
+                return ((string)(this["MyAdsGroups"]));
+            }
+            set {
+                this["MyAdsGroups"] = value;
+            }
+        }
     }
 }

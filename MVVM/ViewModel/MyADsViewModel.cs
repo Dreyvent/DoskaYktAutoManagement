@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.ComponentModel;
 using System.Windows.Data;
 using System.Windows.Threading;
+using System.Collections.Generic;
 
 namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 {
@@ -246,6 +247,11 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 _uiTimer.Start();
             }
             catch { }
+
+            // Initialize groups from settings and existing ads
+            InitializeGroups();
+            CreateGroupCommand = new RelayCommand(CreateGroup);
+            DeleteGroupCommand = new RelayCommand(DeleteCurrentGroup, () => CanModifyCurrentGroup);
         }
 
         // ===== Sorting =====
@@ -291,7 +297,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
         }
 
         // ============= Filtering =============
-        private string _filterMode = "Все"; // "Все" | "Опубликованные" | "Снятые"
+        private string _filterMode = "Все"; // "Все" | "Опубликованные" | "Снятые" | "Выбранные" | "С таймером" | группы
         public string FilterMode
         {
             get => _filterMode;
@@ -306,19 +312,47 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             }
         }
 
+        private string _groupFilter = "Без групп"; // "Без групп" | "Группа 1" ...
+        public string GroupFilter
+        {
+            get => _groupFilter;
+            set
+            {
+                if (_groupFilter != value)
+                {
+                    _groupFilter = value;
+                    OnPropertyChanged(nameof(GroupFilter));
+                    ApplyFilter();
+                    // Update command availability related to groups
+                    DeleteGroupCommand?.RaiseCanExecuteChanged();
+                }
+            }
+        }
+
         private void ApplyFilter()
         {
             if (MyAdsView == null) return;
             MyAdsView.Filter = obj =>
             {
                 if (obj is not Ad ad) return false;
+                var acc = AccountManager.Instance.SelectedAccount;
+                if (acc != null && ad.AccountId != acc.Id) return false;
                 var mode = (FilterMode ?? "Все").Trim();
+                var group = (GroupFilter ?? "Без групп").Trim();
+                if (!string.Equals(group, "Без групп", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return string.Equals(ad.Group ?? string.Empty, group, System.StringComparison.OrdinalIgnoreCase);
+                }
                 if (string.Equals(mode, "Все", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "All", StringComparison.OrdinalIgnoreCase))
                     return true;
                 if (string.Equals(mode, "Опубликованные", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "Published", StringComparison.OrdinalIgnoreCase))
                     return ad.IsPublished;
                 if (string.Equals(mode, "Снятые", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "Unpublished", StringComparison.OrdinalIgnoreCase))
                     return !ad.IsPublished;
+                if (string.Equals(mode, "Выбранные", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "Selected", StringComparison.OrdinalIgnoreCase))
+                    return ad.IsSelected;
+                if (string.Equals(mode, "С таймером", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "WithTimer", StringComparison.OrdinalIgnoreCase))
+                    return ad.IsAutoRaiseEnabled;
                 return true;
             };
             try { MyAdsView.Refresh(); } catch { }
@@ -421,6 +455,105 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 
             TerminalLogger.Instance.Log($"[Timers] Применён таймер публикации: {minutes} мин.");
         }
+
+        // ============= Groups =============
+        private readonly ObservableCollection<string> _groups = new ObservableCollection<string>();
+        public ObservableCollection<string> Groups => _groups;
+
+        private void InitializeGroups()
+        {
+            _groups.Clear();
+            // Base entries
+            _groups.Add("Без групп");
+            // From settings (comma-separated)
+            try
+            {
+                var saved = (Properties.Settings.Default.MyAdsGroups ?? string.Empty).Trim();
+                if (!string.IsNullOrWhiteSpace(saved))
+                {
+                    foreach (var g in saved.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        var name = g.Trim();
+                        if (!string.IsNullOrWhiteSpace(name) && !_groups.Contains(name))
+                            _groups.Add(name);
+                    }
+                }
+            }
+            catch { }
+            // From existing ads
+            foreach (var g in MyAds.Select(a => a.Group).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct())
+            {
+                if (!_groups.Contains(g)) _groups.Add(g);
+            }
+
+            if (!_groups.Contains(GroupFilter)) GroupFilter = "Без групп";
+            OnPropertyChanged(nameof(Groups));
+        }
+
+        private void SaveGroups()
+        {
+            try
+            {
+                // Exclude "Без групп"
+                var toSave = _groups.Where(g => !string.Equals(g, "Без групп", StringComparison.OrdinalIgnoreCase)).ToArray();
+                Properties.Settings.Default.MyAdsGroups = string.Join(",", toSave);
+                Properties.Settings.Default.Save();
+            }
+            catch { }
+        }
+
+        public RelayCommand CreateGroupCommand { get; private set; }
+        public RelayCommand DeleteGroupCommand { get; private set; }
+
+        private bool CanModifyCurrentGroup => !string.IsNullOrWhiteSpace(GroupFilter) && !string.Equals(GroupFilter, "Без групп", StringComparison.OrdinalIgnoreCase);
+
+        private async void CreateGroup()
+        {
+            // Generate next name: "Группа N"
+            int next = 1;
+            var nums = new List<int>();
+            foreach (var g in _groups)
+            {
+                if (g.StartsWith("Группа ", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (int.TryParse(g.Substring("Группа ".Length), out var n)) nums.Add(n);
+                }
+            }
+            if (nums.Any()) next = nums.Max() + 1; else next = 1;
+            var name = $"Группа {next}";
+            if (!_groups.Contains(name)) _groups.Add(name);
+            // Assign currently selected ads to the new group
+            var selected = GetSelectedAds();
+            foreach (var ad in selected)
+            {
+                ad.Group = name;
+                await AdManager.Instance.UpdateAdAsync(ad);
+            }
+            GroupFilter = name;
+            SaveGroups();
+            OnPropertyChanged(nameof(Groups));
+            ApplyFilter();
+        }
+
+        private async void DeleteCurrentGroup()
+        {
+            if (!CanModifyCurrentGroup) return;
+            var group = GroupFilter;
+            // Remove assignment from ads
+            var affected = MyAds.Where(a => string.Equals(a.Group, group, StringComparison.OrdinalIgnoreCase)).ToList();
+            foreach (var ad in affected)
+            {
+                ad.Group = string.Empty;
+                await AdManager.Instance.UpdateAdAsync(ad);
+            }
+            _groups.Remove(group);
+            GroupFilter = "Без групп";
+            SaveGroups();
+            ApplyFilter();
+            OnPropertyChanged(nameof(Groups));
+        }
+
+        
 
         private void ApplyTimersCombined()
         {
@@ -630,6 +763,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             RemoveTimersCommand.RaiseCanExecuteChanged();
             ApplyPublishTimerCommand.RaiseCanExecuteChanged();
             ApplyTimersCommand.RaiseCanExecuteChanged();
+            DeleteGroupCommand?.RaiseCanExecuteChanged();
         }
 
         // ================= Реализация команд =================

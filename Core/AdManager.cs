@@ -49,7 +49,7 @@ namespace DoskaYkt_AutoManagement.Core
         {
             Ads.Clear();
             var rows = await DatabaseHelper.GetAnnouncementsAsync().ConfigureAwait(false);
-            foreach (var (id, title, cycle, isAuto, accountId, accountLogin, siteId, isPublishedOnSite, nextUnpublishAt, nextRepublishAt) in rows)
+            foreach (var (id, title, cycle, isAuto, accountId, accountLogin, siteId, group, isPublishedOnSite, nextUnpublishAt, nextRepublishAt) in rows)
             {
                 var ad = new Ad
                 {
@@ -62,6 +62,7 @@ namespace DoskaYkt_AutoManagement.Core
                     AccountId = accountId,
                     AccountLogin = accountLogin,
                     SiteId = siteId,
+                    Group = group,
                     IsPublished = isPublishedOnSite, // Синхронизируем с состоянием на сайте
                     IsPublishedOnSite = isPublishedOnSite,
                     NextUnpublishAt = string.IsNullOrEmpty(nextUnpublishAt) ? (DateTime?)null : (DateTime.TryParseExact(nextUnpublishAt, "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var unpublishDate) ? unpublishDate : (DateTime.TryParse(nextUnpublishAt, out var unpubFallback) ? unpubFallback : (DateTime?)null)),
@@ -88,6 +89,7 @@ namespace DoskaYkt_AutoManagement.Core
                 ad.AccountId,
                 ad.AccountLogin,
                 ad.SiteId ?? "",
+                ad.Group ?? "",
                 ad.IsPublishedOnSite,
                 ad.NextUnpublishAt?.ToString("yyyy-MM-dd HH:mm:ss"),
                 ad.NextRepublishAt?.ToString("yyyy-MM-dd HH:mm:ss")
@@ -125,6 +127,7 @@ namespace DoskaYkt_AutoManagement.Core
                     ad.AccountId,
                     ad.AccountLogin,
                     ad.SiteId ?? "",
+                    ad.Group ?? "",
                     ad.IsPublishedOnSite,
                     ad.NextUnpublishAt?.ToString("yyyy-MM-dd HH:mm:ss"),
                     ad.NextRepublishAt?.ToString("yyyy-MM-dd HH:mm:ss")

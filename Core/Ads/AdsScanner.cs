@@ -24,7 +24,7 @@ namespace DoskaYkt_AutoManagement.Core.Ads
         {
             var ads = new List<AdData>();
             await _auth.LoginAsync(login, password, showBrowser, cancellationToken).ConfigureAwait(false);
-            var page = _session.Page;
+            var page = await _session.CreatePageAsync(showBrowser).ConfigureAwait(false);
 
             string baseUrl = "https://doska.ykt.ru/profile/posts";
             int safetyPages = 50; // предохранитель от бесконечных переходов
@@ -124,13 +124,14 @@ namespace DoskaYkt_AutoManagement.Core.Ads
             }
 
             return (true, $"Найдено {ads.Count} объявлений", ads);
+            
         }
 
         public async Task<(bool success, string message, List<AdData> ads)> CheckUnpublishedAdsAsync(string login, string password, bool showBrowser, CancellationToken cancellationToken = default)
         {
             var ads = new List<AdData>();
             await _auth.LoginAsync(login, password, showBrowser, cancellationToken).ConfigureAwait(false);
-            var page = _session.Page;
+            var page = await _session.CreatePageAsync(showBrowser).ConfigureAwait(false);
 
             string baseUrl = "https://doska.ykt.ru/profile/posts/finished";
             int safetyPages = 50;

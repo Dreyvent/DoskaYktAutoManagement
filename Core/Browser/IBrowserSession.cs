@@ -8,6 +8,7 @@ namespace DoskaYkt_AutoManagement.Core.Browser
         bool IsActive { get; }
         IPage Page { get; }
         Task EnsureAsync(bool showBrowser);
+        Task<IPage> CreatePageAsync(bool showBrowser);
         Task CloseAsync();
     }
 }

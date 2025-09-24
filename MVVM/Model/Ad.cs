@@ -58,5 +58,8 @@ namespace DoskaYkt_AutoManagement.MVVM.Model
             get => _isPublishedOnSite;
             set => SetProperty(ref _isPublishedOnSite, value);
         }
+
+        private string _group = string.Empty;
+        public string Group { get => _group; set => SetProperty(ref _group, value); }
     }
 }

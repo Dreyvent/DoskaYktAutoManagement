@@ -22,6 +22,24 @@ namespace DoskaYkt_AutoManagement.Core.Browser
             _page = await _context.NewPageAsync().ConfigureAwait(false);
         }
 
+        public async Task<IPage> CreatePageAsync(bool showBrowser)
+        {
+            if (_browser == null)
+            {
+                await EnsureAsync(showBrowser).ConfigureAwait(false);
+            }
+            // If max concurrency is 1, reuse the primary page to avoid extra tabs
+            int maxConc;
+            try { maxConc = DoskaYkt_AutoManagement.Properties.Settings.Default.TaskQueueMaxConcurrency; }
+            catch { maxConc = 1; }
+            if (maxConc <= 1)
+            {
+                return _page;
+            }
+            // Otherwise, open a fresh tab for this task
+            return await _context.NewPageAsync().ConfigureAwait(false);
+        }
+
         public async Task CloseAsync()
         {
             try { if (_page != null) await _page.CloseAsync(); } catch { }

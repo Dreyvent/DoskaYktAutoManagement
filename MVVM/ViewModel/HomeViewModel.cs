@@ -99,6 +99,23 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             }
         }
 
+        public int TaskQueueMaxConcurrency
+        {
+            get => Math.Clamp(Properties.Settings.Default.TaskQueueMaxConcurrency, 1, 3);
+            set
+            {
+                var clamped = Math.Clamp(value, 1, 3);
+                if (Properties.Settings.Default.TaskQueueMaxConcurrency != clamped)
+                {
+                    Properties.Settings.Default.TaskQueueMaxConcurrency = clamped;
+                    Properties.Settings.Default.Save();
+                    OnPropertyChanged();
+                    // применяем сразу
+                    TaskQueue.Instance.SetMaxConcurrency(clamped);
+                }
+            }
+        }
+
         // Команды
         public AsyncRelayCommand CheckAdsCommand { get; }
         public AsyncRelayCommand SaveSelectedCommand { get; }
