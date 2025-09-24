@@ -118,5 +118,17 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["UsePlaywright"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool SleepAtNight {
+            get {
+                return ((bool)(this["SleepAtNight"]));
+            }
+            set {
+                this["SleepAtNight"] = value;
+            }
+        }
     }
 }

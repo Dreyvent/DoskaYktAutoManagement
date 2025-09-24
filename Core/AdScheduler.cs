@@ -36,6 +36,27 @@ namespace DoskaYkt_AutoManagement.Core
 
             double delay;
 
+            // Night sleep mode: if enabled and current time in [00:00, 07:00), schedule to 07:00
+            bool sleepAtNight = DoskaYkt_AutoManagement.Properties.Settings.Default.SleepAtNight;
+            DateTime now = DateTime.Now;
+            if (sleepAtNight && now.Hour < 7)
+            {
+                var nextMorning = new DateTime(now.Year, now.Month, now.Day, 7, 0, 0);
+                delay = (nextMorning - now).TotalMilliseconds;
+                if (delay < 1000) delay = 1000;
+                var pauseTimer = new Timer(delay);
+                pauseTimer.AutoReset = false;
+                pauseTimer.Elapsed += (s, e) =>
+                {
+                    pauseTimer.Stop();
+                    try { StartForAd(ad); } catch { }
+                };
+                pauseTimer.Start();
+                _timers[ad.Id] = pauseTimer;
+                TerminalLogger.Instance.Log($"[Scheduler] Ночной режим активен. '{ad.Title}' будет запущено в 07:00.");
+                return;
+            }
+
             if (ad.IsPublished)
             {
                 if (ad.UnpublishMinutes <= 0)

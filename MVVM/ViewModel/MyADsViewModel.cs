@@ -79,6 +79,23 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             set => SetProperty(ref _isOperationInProgress, value);
         }
 
+        // Night sleep mode
+        public bool SleepAtNight
+        {
+            get => Properties.Settings.Default.SleepAtNight;
+            set
+            {
+                if (Properties.Settings.Default.SleepAtNight != value)
+                {
+                    Properties.Settings.Default.SleepAtNight = value;
+                    try { Properties.Settings.Default.Save(); } catch { }
+                    OnPropertyChanged();
+                    // Optionally restart timers to apply new policy immediately
+                    AdScheduler.Instance.RestartAllTimers();
+                }
+            }
+        }
+
         // UI timer to refresh time-left labels while staying on the view
         private readonly DispatcherTimer _uiTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         private int _nowTick;
@@ -188,12 +205,18 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 
             SelectAllCommand = new RelayCommand(() =>
             {
-                foreach (var ad in MyAds) ad.IsSelected = true;
+                foreach (var item in MyAdsView)
+                {
+                    if (item is Ad ad) ad.IsSelected = true;
+                }
                 RefreshCommands();
             });
             ClearSelectionCommand = new RelayCommand(() =>
             {
-                foreach (var ad in MyAds) ad.IsSelected = false;
+                foreach (var item in MyAdsView)
+                {
+                    if (item is Ad ad) ad.IsSelected = false;
+                }
                 RefreshCommands();
             });
 
@@ -244,7 +267,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             {
                 MyAdsView.SortDescriptions.Clear();
                 var dir = SortAscending ? ListSortDirection.Ascending : ListSortDirection.Descending;
-                if (string.Equals(SortBy, "Title", System.StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(SortBy, "По названию", System.StringComparison.OrdinalIgnoreCase))
                     MyAdsView.SortDescriptions.Add(new SortDescription(nameof(Ad.Title), dir));
                 else if (string.Equals(SortBy, "SiteId", System.StringComparison.OrdinalIgnoreCase))
                     MyAdsView.SortDescriptions.Add(new SortDescription(nameof(Ad.SiteId), dir));
@@ -253,6 +276,7 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 else
                     MyAdsView.SortDescriptions.Add(new SortDescription(nameof(Ad.Title), dir));
             }
+            ApplyFilter();
         }
 
         private void SaveSortPreferences()
@@ -264,6 +288,40 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 Properties.Settings.Default.Save();
             }
             catch { }
+        }
+
+        // ============= Filtering =============
+        private string _filterMode = "Все"; // "Все" | "Опубликованные" | "Снятые"
+        public string FilterMode
+        {
+            get => _filterMode;
+            set
+            {
+                if (_filterMode != value)
+                {
+                    _filterMode = value;
+                    OnPropertyChanged(nameof(FilterMode));
+                    ApplyFilter();
+                }
+            }
+        }
+
+        private void ApplyFilter()
+        {
+            if (MyAdsView == null) return;
+            MyAdsView.Filter = obj =>
+            {
+                if (obj is not Ad ad) return false;
+                var mode = (FilterMode ?? "Все").Trim();
+                if (string.Equals(mode, "Все", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "All", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                if (string.Equals(mode, "Опубликованные", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "Published", StringComparison.OrdinalIgnoreCase))
+                    return ad.IsPublished;
+                if (string.Equals(mode, "Снятые", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "Unpublished", StringComparison.OrdinalIgnoreCase))
+                    return !ad.IsPublished;
+                return true;
+            };
+            try { MyAdsView.Refresh(); } catch { }
         }
 
         private void ApplyUnpublishTimer()

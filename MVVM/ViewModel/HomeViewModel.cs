@@ -118,12 +118,18 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
             SaveSelectedCommand = new AsyncRelayCommand(SaveSelectedAdsAsync);
             SelectAllFoundCommand = new RelayCommand(() =>
             {
-                foreach (var ad in FoundAds) ad.IsSelected = true;
+                foreach (var item in FoundAdsView)
+                {
+                    if (item is AdData ad) ad.IsSelected = true;
+                }
                 OnPropertyChanged(nameof(SelectedFoundAds));
             });
             ClearFoundSelectionCommand = new RelayCommand(() =>
             {
-                foreach (var ad in FoundAds) ad.IsSelected = false;
+                foreach (var item in FoundAdsView)
+                {
+                    if (item is AdData ad) ad.IsSelected = false;
+                }
                 OnPropertyChanged(nameof(SelectedFoundAds));
             });
             EndSessionCommand = new AsyncRelayCommand(async () =>
@@ -269,6 +275,40 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                 else
                     FoundAdsView.SortDescriptions.Add(new SortDescription(nameof(AdData.Title), dir));
             }
+            ApplyFoundFilter();
+        }
+
+        private string _foundFilterMode = "Все"; // "Все" | "Опубликованные" | "Снятые"
+        public string FoundFilterMode
+        {
+            get => _foundFilterMode;
+            set
+            {
+                if (_foundFilterMode != value)
+                {
+                    _foundFilterMode = value;
+                    OnPropertyChanged(nameof(FoundFilterMode));
+                    ApplyFoundFilter();
+                }
+            }
+        }
+
+        private void ApplyFoundFilter()
+        {
+            if (FoundAdsView == null) return;
+            FoundAdsView.Filter = obj =>
+            {
+                if (obj is not AdData ad) return false;
+                var mode = (FoundFilterMode ?? "Все").Trim();
+                if (string.Equals(mode, "Все", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "All", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                if (string.Equals(mode, "Опубликованные", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "Published", StringComparison.OrdinalIgnoreCase))
+                    return ad.IsPublished;
+                if (string.Equals(mode, "Снятые", StringComparison.OrdinalIgnoreCase) || string.Equals(mode, "Unpublished", StringComparison.OrdinalIgnoreCase))
+                    return !ad.IsPublished;
+                return true;
+            };
+            try { FoundAdsView.Refresh(); } catch { }
         }
 
         private async Task SaveSelectedAdsAsync()
