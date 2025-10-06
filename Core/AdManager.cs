@@ -26,8 +26,13 @@ namespace DoskaYkt_AutoManagement.Core
 
         private AdManager()
         {
-            // сразу асинхронная загрузка (не блокирует UI)
-            _ = LoadFromDatabaseAsync();
+            // Удалено: _ = LoadFromDatabaseAsync();
+            // Не вызываем AdScheduler.Instance в конструкторе
+        }
+
+        public async Task InitializeAsync()
+        {
+            await LoadFromDatabaseAsync();
         }
 
         private Ad _selectedAd;

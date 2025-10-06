@@ -9,7 +9,7 @@ namespace DoskaYkt_AutoManagement.Core
     public class TerminalLogger
     {
         private static TerminalLogger? _instance;
-        public static TerminalLogger Instance => _instance ??= new TerminalLogger();
+        public static TerminalLogger Instance => _instance ?? (_instance = new TerminalLogger());
 
         public event Action<string>? LogAdded;
 

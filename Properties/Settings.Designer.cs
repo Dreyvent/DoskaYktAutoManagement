@@ -154,5 +154,28 @@ namespace DoskaYkt_AutoManagement.Properties {
                 this["MyAdsGroups"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int NightPauseStartHour {
+            get {
+                return ((int)(this["NightPauseStartHour"]));
+            }
+            set {
+                this["NightPauseStartHour"] = value;
+            }
+        }
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("7")]
+        public int NightPauseEndHour {
+            get {
+                return ((int)(this["NightPauseEndHour"]));
+            }
+            set {
+                this["NightPauseEndHour"] = value;
+            }
+        }
     }
 }

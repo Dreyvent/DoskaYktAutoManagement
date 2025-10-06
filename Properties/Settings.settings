@@ -35,5 +35,11 @@
     <Setting Name="MyAdsGroups" Type="System.String" Scope="User">
       <Value Profile="(Default)">Группа 1</Value>
     </Setting>
+    <Setting Name="NightPauseStartHour" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="NightPauseEndHour" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">7</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

@@ -91,7 +91,41 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
                     Properties.Settings.Default.SleepAtNight = value;
                     try { Properties.Settings.Default.Save(); } catch { }
                     OnPropertyChanged();
-                    // Optionally restart timers to apply new policy immediately
+                    TerminalLogger.Instance.Log(value
+                        ? $"[Scheduler] Ночной режим: активен (с {NightPauseStartHour:00}:00 до {NightPauseEndHour:00}:00)"
+                        : "[Scheduler] Ночной режим: отключён");
+                    AdScheduler.Instance.RestartAllTimers();
+                }
+            }
+        }
+        public int NightPauseStartHour
+        {
+            get => Properties.Settings.Default.NightPauseStartHour;
+            set
+            {
+                var clamped = Math.Clamp(value, 0, 23);
+                if (Properties.Settings.Default.NightPauseStartHour != clamped)
+                {
+                    Properties.Settings.Default.NightPauseStartHour = clamped;
+                    try { Properties.Settings.Default.Save(); } catch { }
+                    OnPropertyChanged();
+                    TerminalLogger.Instance.Log($"[Scheduler] Время ночной паузы изменено: с {clamped:00}:00 до {NightPauseEndHour:00}");
+                    AdScheduler.Instance.RestartAllTimers();
+                }
+            }
+        }
+        public int NightPauseEndHour
+        {
+            get => Properties.Settings.Default.NightPauseEndHour;
+            set
+            {
+                var clamped = Math.Clamp(value, 0, 23);
+                if (Properties.Settings.Default.NightPauseEndHour != clamped)
+                {
+                    Properties.Settings.Default.NightPauseEndHour = clamped;
+                    try { Properties.Settings.Default.Save(); } catch { }
+                    OnPropertyChanged();
+                    TerminalLogger.Instance.Log($"[Scheduler] Время ночной паузы изменено: с {NightPauseStartHour:00}:00 до {clamped:00}:00");
                     AdScheduler.Instance.RestartAllTimers();
                 }
             }

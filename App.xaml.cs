@@ -77,9 +77,13 @@ namespace DoskaYkt_AutoManagement
             // 4) Показываем окно
             MainWindow.Show();
 
-            // Загрузим данные из БД в менеджеры
-            await Core.AccountManager.Instance.LoadAccountsAsync();
-            await Core.AdManager.Instance.LoadFromDatabaseAsync();
+            // Явная инициализация синглтонов
+            await Core.AdManager.Instance.InitializeAsync();
+            Core.AdScheduler.Instance.Initialize();
+
+            // Загрузим данные из БД в менеджеры (удалено дублирующий вызов)
+            // await Core.AccountManager.Instance.LoadAccountsAsync();
+            // await Core.AdManager.Instance.LoadFromDatabaseAsync();
 
             Core.TerminalLogger.Instance.Log("Данные загружены из базы данных.");
 
