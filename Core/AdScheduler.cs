@@ -11,8 +11,6 @@ namespace DoskaYkt_AutoManagement.Core
     public class AdScheduler
     {
         private readonly Dictionary<int, Timer> _timers = new();
-        private Timer _nightSleepTimer; // Глобальный таймер для sleep at night
-        private bool _nightSleepActive = false;
 
         public event Action<Ad> AdPublished;
         public event Action<Ad> AdUnpublished;
@@ -27,135 +25,38 @@ namespace DoskaYkt_AutoManagement.Core
         {
         }
 
+        private bool _initialized;
+
         public void Initialize()
         {
-            SetupNightSleepTimer();
+            if (_initialized) return;
+            _initialized = true;
+
+            SleepAtNightManager.Instance.SleepStarted += OnSleepStarted;
+            SleepAtNightManager.Instance.SleepEnded += OnSleepEnded;
+            SleepAtNightManager.Instance.Initialize();
         }
 
-        private void SetupNightSleepTimer()
+        private void OnSleepStarted()
         {
-            if (_nightSleepTimer != null)
-            {
-                _nightSleepTimer.Stop();
-                _nightSleepTimer.Dispose();
-            }
-            _nightSleepTimer = new Timer();
-            _nightSleepTimer.AutoReset = false;
-            _nightSleepTimer.Elapsed += (s, e) => NightSleepTimerTick();
-            ScheduleNextNightSleepEvent();
+            TerminalLogger.Instance.Log("[Scheduler] Переход в ночной режим — останавливаем все таймеры");
+            StopAll(); // гарантированно глушим таймеры
         }
 
-        private void ScheduleNextNightSleepEvent()
+        private void OnSleepEnded()
         {
-            bool sleepAtNight = DoskaYkt_AutoManagement.Properties.Settings.Default.SleepAtNight;
-            int nightStart = DoskaYkt_AutoManagement.Properties.Settings.Default.NightPauseStartHour;
-            int nightEnd = DoskaYkt_AutoManagement.Properties.Settings.Default.NightPauseEndHour;
-            if (!sleepAtNight)
-            {
-                _nightSleepTimer.Stop();
-                _nightSleepActive = false;
-                return;
-            }
-            DateTime now = DateTime.Now;
-            DateTime todayStart = new DateTime(now.Year, now.Month, now.Day, nightStart, 0, 0);
-            DateTime todayEnd = new DateTime(now.Year, now.Month, now.Day, nightEnd, 0, 0);
-            if (nightEnd <= nightStart)
-                todayEnd = todayEnd.AddDays(1); // интервал через полночь
-            DateTime nextEvent;
-            if (!_nightSleepActive && now >= todayStart && now < todayEnd)
-            {
-                // Уже ночь, sleep режим должен быть активен
-                _nightSleepActive = true;
-                RemoveAllTimers();
-                TerminalLogger.Instance.Log($"[Scheduler] Ночная пауза активирована с {nightStart:00}:00 до {nightEnd:00}:00 (таймеры удалены)");
-                nextEvent = todayEnd;
-            }
-            else if (!_nightSleepActive)
-            {
-                // День, ждём до начала ночи
-                if (now < todayStart)
-                    nextEvent = todayStart;
-                else
-                    nextEvent = todayStart.AddDays(1);
-            }
-            else if (_nightSleepActive && now < todayEnd)
-            {
-                // Уже ночь, ждём до конца ночи
-                nextEvent = todayEnd;
-            }
-            else
-            {
-                // Сейчас день, sleep не активен, ждём до следующей ночи
-                nextEvent = todayStart.AddDays(1);
-            }
-            double delay = (nextEvent - now).TotalMilliseconds;
-            if (delay < 1000) delay = 1000;
-            _nightSleepTimer.Interval = delay;
-            _nightSleepTimer.Start();
-        }
-
-        private void NightSleepTimerTick()
-        {
-            bool sleepAtNight = DoskaYkt_AutoManagement.Properties.Settings.Default.SleepAtNight;
-            int nightStart = DoskaYkt_AutoManagement.Properties.Settings.Default.NightPauseStartHour;
-            int nightEnd = DoskaYkt_AutoManagement.Properties.Settings.Default.NightPauseEndHour;
-            if (!sleepAtNight)
-            {
-                _nightSleepActive = false;
-                return;
-            }
-            DateTime now = DateTime.Now;
-            DateTime todayStart = new DateTime(now.Year, now.Month, now.Day, nightStart, 0, 0);
-            DateTime todayEnd = new DateTime(now.Year, now.Month, now.Day, nightEnd, 0, 0);
-            if (nightEnd <= nightStart)
-                todayEnd = todayEnd.AddDays(1);
-            if (!_nightSleepActive && now >= todayStart && now < todayEnd)
-            {
-                _nightSleepActive = true;
-                RemoveAllTimers();
-                TerminalLogger.Instance.Log($"[Scheduler] Ночная пауза активирована с {nightStart:00}:00 до {nightEnd:00}:00 (таймеры удалены)");
-            }
-            else if (_nightSleepActive && now >= todayEnd)
-            {
-                _nightSleepActive = false;
-                ApplyAllTimers();
-                TerminalLogger.Instance.Log($"[Scheduler] Ночная пауза завершена (таймеры применены)");
-            }
-            ScheduleNextNightSleepEvent();
-        }
-
-        private void RemoveAllTimers()
-        {
-            TerminalLogger.Instance.Log("[Scheduler] Удаление всех таймеров (ночная пауза)");
-            foreach (var ad in AdManager.Instance.Ads)
-            {
-                ad.IsAutoRaiseEnabled = false;
-                ad.NextUnpublishAt = null;
-                ad.NextRepublishAt = null;
-            }
-            StopAll();
-        }
-
-        private void ApplyAllTimers()
-        {
-            TerminalLogger.Instance.Log("[Scheduler] Применение таймеров после ночной паузы");
-            foreach (var ad in AdManager.Instance.Ads)
-            {
-                if (ad.IsAutoRaiseEnabled)
-                {
-                    StartForAd(ad);
-                }
-            }
+            TerminalLogger.Instance.Log("[Scheduler] Завершён ночной режим — перезапускаем активные таймеры");
+            RestartAllTimers(); // заново применяем все таймеры
         }
 
         public void StartForAd(Ad ad)
         {
             StopForAd(ad.Id);
 
-            // Если sleep at night активен, не запускать таймеры ночью
-            if (DoskaYkt_AutoManagement.Properties.Settings.Default.SleepAtNight && _nightSleepActive)
+            // Проверяем сон
+            if (SleepAtNightManager.Instance.IsActiveNow)
             {
-                TerminalLogger.Instance.Log($"[Scheduler] Ночной режим: '{ad.Title}' не будет запущено до окончания паузы.");
+                TerminalLogger.Instance.Log($"[Scheduler] Ночной режим активен — '{ad.Title}' не запущено.");
                 return;
             }
 
@@ -191,12 +92,6 @@ namespace DoskaYkt_AutoManagement.Core
                 timer.AutoReset = false;
                 timer.Elapsed += async (s, e) =>
                 {
-                    // Не запускать действия, если активна ночная пауза
-                    if (DoskaYkt_AutoManagement.Properties.Settings.Default.SleepAtNight && _nightSleepActive)
-                    {
-                        TerminalLogger.Instance.Log($"[Scheduler] [{ad.Title}] Событие снятия пропущено из-за ночной паузы.");
-                        return;
-                    }
                     timer.Stop();
 
                     TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Ставим снятие в очередь...");
@@ -252,12 +147,6 @@ namespace DoskaYkt_AutoManagement.Core
                 timer.AutoReset = false;
                 timer.Elapsed += async (s, e) =>
                 {
-                    // Не запускать действия, если активна ночная пауза
-                    if (DoskaYkt_AutoManagement.Properties.Settings.Default.SleepAtNight && _nightSleepActive)
-                    {
-                        TerminalLogger.Instance.Log($"[Scheduler] [{ad.Title}] Событие публикации пропущено из-за ночной паузы.");
-                        return;
-                    }
                     timer.Stop();
 
                     TerminalLogger.Instance.Log($"[Scheduler] Таймер истёк для '{ad.Title}'. Ставим публикацию в очередь...");

@@ -591,6 +591,12 @@ namespace DoskaYkt_AutoManagement.MVVM.ViewModel
 
         private void ApplyTimersCombined()
         {
+            if (SleepAtNightManager.Instance.IsActiveNow)
+            {
+                TerminalLogger.Instance.Log("[Timers] Применение таймеров отменено — сейчас активен режим сна.");
+                return;
+            }
+
             // Clamp inputs to at least 1 minute
             var unpubMinutes = Math.Clamp(UnpublishMinutesInput, 1, 1440);
             var pubMinutes = Math.Clamp(PublishMinutesInput, 1, 1440);
